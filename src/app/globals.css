@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-mist text-ink antialiased;
+  min-height: 100vh;
+  background-image:
+    radial-gradient(circle at 12% 12%, rgba(37, 99, 235, 0.16), transparent 46%),
+    radial-gradient(circle at 86% 8%, rgba(14, 165, 233, 0.13), transparent 42%),
+    radial-gradient(circle at 50% 100%, rgba(148, 163, 184, 0.09), transparent 52%),
+    linear-gradient(180deg, #f8fbff 0%, #eef3fb 100%);
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-attachment: fixed;
+}
+
+.panel {
+  @apply rounded-2xl border border-slate-200/80 bg-white/90 shadow-panel backdrop-blur;
+}
+
+.section-title {
+  @apply font-[family-name:var(--font-display)] text-xl font-bold tracking-tight text-slate-900;
+}
+
+.section-subtitle {
+  @apply mt-1 text-sm leading-6 text-slate-600;
+}
+
+.field-label {
+  @apply text-xs font-semibold tracking-wide text-slate-500;
+}
+
+.select-field {
+  @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100;
+}

@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OffshoreMatch | 日本企業向けオフショア開発マッチング</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar__inner">
+        <div class="brand">
+          <span class="brand__logo">OM</span>
+          <div>
+            <p class="brand__name">OffshoreMatch</p>
+            <p class="brand__sub">日本企業向けSaaS</p>
+          </div>
+        </div>
+        <nav class="tabs" aria-label="主要ナビゲーション">
+          <button class="tab is-active" data-view="marketplace">マーケットプレイス</button>
+          <button class="tab" data-view="buyer">AIマッチング</button>
+          <button class="tab" data-view="vendor">開発会社ダッシュボード</button>
+          <button class="tab" data-view="pricing">料金プラン</button>
+        </nav>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="hero__inner">
+        <div>
+          <p class="eyebrow">B2B Matchmaking SaaS</p>
+          <h1>日本企業と優良オフショア開発会社を、最短でつなぐ</h1>
+          <p class="hero__lead">
+            ログイン不要の公開検索 + AIヒアリングによる自動マッチング。
+            開発会社はプランとブースト機能で露出強化が可能です。
+          </p>
+        </div>
+        <div class="kpi-grid" id="kpiGrid"></div>
+      </div>
+    </section>
+
+    <main class="app-shell">
+      <section class="view is-visible" id="view-marketplace">
+        <div class="panel panel--filters">
+          <h2>公開ディレクトリ（ログイン不要）</h2>
+          <p class="muted">日本企業は会員登録なしで開発会社を比較できます。</p>
+          <div class="filters">
+            <input id="searchInput" type="search" placeholder="会社名・技術で検索（例: React, Java, AWS）" />
+            <select id="techFilter">
+              <option value="">技術スタック（すべて）</option>
+              <option value="react">React</option>
+              <option value="node">Node.js</option>
+              <option value="java">Java</option>
+              <option value="python">Python</option>
+              <option value="aws">AWS</option>
+              <option value="mobile">Mobile</option>
+              <option value="php">PHP</option>
+            </select>
+            <select id="rateFilter">
+              <option value="">単価上限（指定なし）</option>
+              <option value="30">$30 /h 以下</option>
+              <option value="40">$40 /h 以下</option>
+              <option value="50">$50 /h 以下</option>
+              <option value="70">$70 /h 以下</option>
+            </select>
+          </div>
+        </div>
+        <div id="directory" class="company-grid"></div>
+      </section>
+
+      <section class="view" id="view-buyer">
+        <div class="panel">
+          <h2>企業向け AI マッチング</h2>
+          <p class="muted">要件を自然文で入力すると、候補会社を優先度付きで提案します。</p>
+          <div id="authBlock"></div>
+          <div id="matcher" class="hidden">
+            <label for="chatInput">どんなチームを探していますか？</label>
+            <textarea id="chatInput" rows="5" placeholder="例: 東京のSaaS企業です。React + Node.js エンジニア4名、6ヶ月、予算は時給30ドルまで。英語力は高いチーム希望。"></textarea>
+            <button id="runMatch">AIでマッチングする</button>
+
+            <h3>抽出された要件</h3>
+            <pre id="criteriaBox">{}</pre>
+
+            <h3>マッチ候補</h3>
+            <div id="matchResults" class="company-grid"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-vendor">
+        <div class="panel">
+          <h2>開発会社ダッシュボード</h2>
+          <p class="muted">プラン変更や短期ブースト購入で表示優先度を強化できます。</p>
+
+          <div class="vendor-grid">
+            <div class="vendor-card">
+              <h3>登録会社</h3>
+              <select id="vendorCompany"></select>
+              <div id="vendorSummary" class="muted">会社を選択してください。</div>
+            </div>
+
+            <div class="vendor-card">
+              <h3>プラン管理</h3>
+              <select id="planSelect"></select>
+              <button id="savePlan">プランを更新</button>
+              <p class="muted" id="planMessage"></p>
+            </div>
+
+            <div class="vendor-card vendor-card--wide">
+              <h3>ブースト購入（短期露出）</h3>
+              <div id="boostPackages" class="package-grid"></div>
+              <p class="muted" id="boostMessage"></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-pricing">
+        <div class="panel">
+          <h2>料金プラン</h2>
+          <p class="muted">月額プラン + 必要なときだけのブースト課金</p>
+          <div id="pricingGrid" class="pricing-grid"></div>
+          <div class="panel panel--sub" id="boostCatalog"></div>
+        </div>
+      </section>
+    </main>
+
+    <template id="companyCardTemplate">
+      <article class="company-card">
+        <header>
+          <h4 class="name"></h4>
+          <p class="tier"></p>
+        </header>
+        <p class="summary"></p>
+        <ul class="chips tags"></ul>
+        <dl class="price-row">
+          <dt>単価目安</dt>
+          <dd class="rate"></dd>
+        </dl>
+        <p class="meta"></p>
+      </article>
+    </template>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
