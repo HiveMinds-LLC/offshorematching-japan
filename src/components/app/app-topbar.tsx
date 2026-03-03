@@ -10,12 +10,12 @@ type AppTopbarProps = {
 export function AppTopbar({ title, subtitle }: AppTopbarProps) {
   return (
     <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-3">
+      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <Link href="/" className="font-[family-name:var(--font-display)] text-lg font-extrabold text-slate-900">
             OffshoreMatch
           </Link>
-          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-600 sm:text-[11px]">
             {title}
           </span>
         </div>

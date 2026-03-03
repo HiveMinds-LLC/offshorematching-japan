@@ -16,7 +16,7 @@ export default function PricingPage() {
           <div className="mx-auto grid w-full max-w-7xl gap-10 lg:grid-cols-[1.05fr,0.95fr] lg:items-center">
             <div>
               <p className="inline-flex rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-semibold text-blue-700">PRICING</p>
-              <h1 className="mt-5 font-[family-name:var(--font-display)] text-5xl font-extrabold leading-[1.1] text-slate-900">
+              <h1 className="mt-5 font-[family-name:var(--font-display)] text-4xl font-extrabold leading-[1.1] text-slate-900 sm:text-5xl">
                 料金はシンプル、
                 <br />
                 運用は本格的。
@@ -35,7 +35,7 @@ export default function PricingPage() {
           <div className="mx-auto grid w-full max-w-7xl gap-5 md:grid-cols-2">
             <article className="panel border-blue-100 bg-blue-50 p-9">
               <p className="text-xs font-semibold tracking-wide text-blue-700">開発会社向け</p>
-              <p className="mt-2 font-[family-name:var(--font-display)] text-5xl font-extrabold text-slate-900">¥5,000</p>
+              <p className="mt-2 font-[family-name:var(--font-display)] text-4xl font-extrabold text-slate-900 sm:text-5xl">¥5,000</p>
               <p className="mt-1 text-sm font-semibold text-slate-600">/ 月</p>
               <ul className="mt-6 grid gap-2 text-sm leading-7 text-slate-700">
                 <li>会社プロフィール公開</li>
@@ -46,7 +46,7 @@ export default function PricingPage() {
             </article>
             <article className="panel border-emerald-100 bg-emerald-50 p-9">
               <p className="text-xs font-semibold tracking-wide text-emerald-700">発注企業向け</p>
-              <p className="mt-2 font-[family-name:var(--font-display)] text-5xl font-extrabold text-slate-900">無料</p>
+              <p className="mt-2 font-[family-name:var(--font-display)] text-4xl font-extrabold text-slate-900 sm:text-5xl">無料</p>
               <p className="mt-1 text-sm font-semibold text-slate-600">/ 月</p>
               <ul className="mt-6 grid gap-2 text-sm leading-7 text-slate-700">
                 <li>公開ディレクトリの閲覧</li>
@@ -60,7 +60,7 @@ export default function PricingPage() {
 
         <SectionReveal className="px-4 pb-24">
           <div className="mx-auto w-full max-w-7xl rounded-[28px] bg-slate-900 px-8 py-12 text-white">
-            <h2 className="font-[family-name:var(--font-display)] text-4xl font-bold">審査フロー</h2>
+            <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold sm:text-4xl">審査フロー</h2>
             <div className="mt-7 grid gap-4 md:grid-cols-3">
               <article className="rounded-2xl border border-white/15 bg-white/5 p-5">
                 <p className="text-xs font-semibold tracking-wide text-cyan-300">STEP 1</p>

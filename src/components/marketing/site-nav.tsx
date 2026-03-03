@@ -10,7 +10,7 @@ const navItems = [
 export function SiteNav() {
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/90 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3">
+      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3">
         <Link href="/" className="font-[family-name:var(--font-display)] text-lg font-extrabold text-slate-900">
           OffshoreMatch
         </Link>
@@ -22,7 +22,7 @@ export function SiteNav() {
           ))}
         </nav>
         <div className="flex items-center gap-2">
-          <Link href="/pricing" className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+          <Link href="/pricing" className="hidden rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:inline-flex">
             料金を見る
           </Link>
           <Link href="/app" className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700">

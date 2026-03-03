@@ -28,7 +28,7 @@ export default function VendorMarketPage() {
           <div className="mx-auto grid w-full max-w-7xl gap-10 lg:grid-cols-[1.05fr,0.95fr] lg:items-center">
             <div>
               <p className="inline-flex rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-semibold text-blue-700">FOR VENDORS</p>
-              <h1 className="mt-5 font-[family-name:var(--font-display)] text-5xl font-extrabold leading-[1.1] text-slate-900">
+              <h1 className="mt-5 font-[family-name:var(--font-display)] text-4xl font-extrabold leading-[1.1] text-slate-900 sm:text-5xl">
                 開発会社向け
                 <br />
                 掲載プログラム
@@ -56,7 +56,7 @@ export default function VendorMarketPage() {
 
         <SectionReveal className="px-4 pb-24">
           <div className="mx-auto w-full max-w-7xl rounded-[28px] border border-slate-200 bg-white p-10">
-            <h2 className="font-[family-name:var(--font-display)] text-4xl font-bold text-slate-900">掲載開始まで</h2>
+            <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold text-slate-900 sm:text-4xl">掲載開始まで</h2>
             <div className="mt-7 grid gap-4 md:grid-cols-3">
               {requirements.map((item, i) => (
                 <article key={item.title} className="rounded-2xl border border-slate-200 bg-slate-50 p-6">

@@ -676,7 +676,7 @@ export function OffshoreMatchApp() {
                         <Button variant="ghost" onClick={handleResetChat}>新規相談</Button>
                       </div>
 
-                      <div className="max-h-[460px] min-h-[360px] space-y-2 overflow-auto rounded-xl border border-slate-200 bg-white p-4">
+                      <div className="max-h-[460px] min-h-[260px] space-y-2 overflow-auto rounded-xl border border-slate-200 bg-white p-4 md:min-h-[360px]">
                         {chatMessages.map((msg) => (
                           <div key={msg.id} className={`max-w-[90%] rounded-xl px-3 py-2 text-sm leading-6 ${msg.role === "assistant" ? "bg-blue-50 text-slate-800" : "ml-auto bg-slate-900 text-white"}`}>
                             <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -746,7 +746,7 @@ export function OffshoreMatchApp() {
                       </div>
 
                       <div className="grid gap-2">
-                        <div className="max-h-80 min-h-[220px] space-y-2 overflow-auto rounded-xl border border-slate-200 bg-white p-3">
+                        <div className="max-h-80 min-h-[180px] space-y-2 overflow-auto rounded-xl border border-slate-200 bg-white p-3 md:min-h-[220px]">
                           {threadMessages.map((msg) => (
                             <div
                               key={msg.id}
@@ -859,7 +859,7 @@ export function OffshoreMatchApp() {
                     </div>
 
                     <div className="grid gap-2">
-                      <div className="max-h-80 min-h-[220px] space-y-2 overflow-auto rounded-xl border border-slate-200 bg-white p-3">
+                      <div className="max-h-80 min-h-[180px] space-y-2 overflow-auto rounded-xl border border-slate-200 bg-white p-3 md:min-h-[220px]">
                         {vendorThreadMessages.map((msg) => (
                           <div
                             key={msg.id}
