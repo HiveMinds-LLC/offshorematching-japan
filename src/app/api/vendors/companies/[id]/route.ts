@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import type { Company } from "@/lib/domain/types";
 import { getCompanyProfile, updateCompanyProfile } from "@/lib/server/api-store";
 
 type Params = { params: Promise<{ id: string }> };
@@ -20,6 +21,8 @@ export async function PATCH(request: Request, { params }: Params) {
   const websiteUrl = String(body.websiteUrl ?? "").trim();
   const publicContactEmail = String(body.publicContactEmail ?? "").trim();
   const publicContactPhone = String(body.publicContactPhone ?? "").trim();
+  const preferredLanguage = body.preferredLanguage ? (String(body.preferredLanguage) as Company["preferredLanguage"]) : undefined;
+  const portfolioProjects = Array.isArray(body.portfolioProjects) ? (body.portfolioProjects as Company["portfolioProjects"]) : [];
 
   if (!summary) return NextResponse.json({ error: "summary is required." }, { status: 400 });
 
@@ -27,7 +30,9 @@ export async function PATCH(request: Request, { params }: Params) {
     summary,
     websiteUrl: websiteUrl || undefined,
     publicContactEmail: publicContactEmail || undefined,
-    publicContactPhone: publicContactPhone || undefined
+    publicContactPhone: publicContactPhone || undefined,
+    preferredLanguage,
+    portfolioProjects
   });
   if (!updated) return NextResponse.json({ error: "Company not found." }, { status: 404 });
   return NextResponse.json({ company: updated });

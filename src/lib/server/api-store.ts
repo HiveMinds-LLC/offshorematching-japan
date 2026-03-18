@@ -1,13 +1,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { parseCriteria, runTierAwareMatch } from "@/lib/matching";
-import type { BuyerCriteria, BuyerOrganization, Company, VendorApplication } from "@/lib/domain/types";
+import type { BuyerCriteria, BuyerOrganization, Company, DealRecord, DealStatus, MatchResult, VendorApplication, VendorBillingAccount } from "@/lib/domain/types";
 import { mockDb } from "@/lib/server/mock-db";
-
-type MatchResult = {
-  company: Company;
-  score: number;
-};
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -28,16 +23,19 @@ export function isSupabaseConfigured() {
 }
 
 function toCompany(row: Record<string, unknown>): Company {
+  const plan = row.plan_key === "translation" ? "translation" : "basic";
   return {
     id: String(row.id),
     name: String(row.company_name ?? ""),
     country: String(row.country ?? "Unknown"),
-    plan: (row.plan_key as Company["plan"]) ?? "developer",
+    plan,
     websiteUrl: row.website_url ? String(row.website_url) : undefined,
     publicContactEmail: row.public_contact_email ? String(row.public_contact_email) : undefined,
     publicContactPhone: row.public_contact_phone ? String(row.public_contact_phone) : undefined,
+    preferredLanguage: row.preferred_language ? (String(row.preferred_language) as Company["preferredLanguage"]) : undefined,
     summary: String(row.summary ?? ""),
     services: Array.isArray(row.services) ? (row.services as string[]) : [],
+    portfolioProjects: Array.isArray(row.portfolio_projects) ? (row.portfolio_projects as Company["portfolioProjects"]) : [],
     minRate: Number(row.min_rate ?? 20),
     maxRate: Number(row.max_rate ?? 40),
     teamSize: Number(row.team_size ?? 10),
@@ -57,7 +55,9 @@ function toVendorApplication(row: Record<string, unknown>): VendorApplication {
       website_url: row.website_url,
       public_contact_email: row.public_contact_email,
       public_contact_phone: row.public_contact_phone,
+      preferred_language: row.preferred_language,
       services: row.services,
+      portfolio_projects: row.portfolio_projects,
       min_rate: row.min_rate,
       max_rate: row.max_rate,
       team_size: row.team_size,
@@ -69,7 +69,30 @@ function toVendorApplication(row: Record<string, unknown>): VendorApplication {
     contactEmail: String(row.contact_email ?? ""),
     status: (row.status as VendorApplication["status"]) ?? "pending",
     submittedAt: String(row.submitted_at ?? new Date().toISOString()),
-    reviewNote: row.review_note ? String(row.review_note) : undefined
+    reviewNote: row.review_note ? String(row.review_note) : undefined,
+    termsAcceptedAt: row.terms_accepted_at ? String(row.terms_accepted_at) : undefined,
+    termsVersion: row.terms_version ? String(row.terms_version) : undefined
+  };
+}
+
+function toBillingAccount(row: Record<string, unknown>): VendorBillingAccount {
+  const plan = row.plan_key === "translation" ? "translation" : "basic";
+  return {
+    companyId: String(row.company_id ?? row.vendor_profile_id ?? ""),
+    applicationId: row.application_id ? String(row.application_id) : undefined,
+    companyName: String(row.company_name ?? ""),
+    contactEmail: String(row.contact_email ?? ""),
+    plan,
+    translationEnabled: Boolean(row.translation_enabled ?? plan === "translation"),
+    monthlyPriceJpy: Number(row.monthly_price_jpy ?? (plan === "translation" ? 10000 : 5000)),
+    status: (row.status as VendorBillingAccount["status"]) ?? "pending_checkout",
+    termsAcceptedAt: row.terms_accepted_at ? String(row.terms_accepted_at) : undefined,
+    termsVersion: row.terms_version ? String(row.terms_version) : undefined,
+    currentPeriodEnd: row.current_period_end ? String(row.current_period_end) : undefined,
+    pauseRequestedAt: row.pause_requested_at ? String(row.pause_requested_at) : undefined,
+    canceledAt: row.canceled_at ? String(row.canceled_at) : undefined,
+    stripeCustomerId: row.stripe_customer_id ? String(row.stripe_customer_id) : undefined,
+    stripeSubscriptionId: row.stripe_subscription_id ? String(row.stripe_subscription_id) : undefined
   };
 }
 
@@ -85,12 +108,12 @@ function buildAssistantReply(nextCriteria: BuyerCriteria, topMatches: MatchResul
   if (nextCriteria.durationMonths === null) missing.push("契約期間");
 
   const topText =
-    topMatches.length > 0
-      ? topMatches
-          .slice(0, 3)
-          .map((entry, index) => `${index + 1}. ${entry.company.name} (score ${entry.score.toFixed(1)})`)
-          .join("\n")
-      : "一致する候補がまだ見つかりません。要件を少し広げる提案も可能です。";
+      topMatches.length > 0
+        ? topMatches
+            .slice(0, 3)
+            .map((entry, index) => `${index + 1}. ${entry.company.name} (score ${entry.score.toFixed(1)}) - ${entry.reasons.slice(0, 2).join(" / ") || "基本条件に適合"}`)
+            .join("\n")
+        : "一致する候補がまだ見つかりません。要件を少し広げる提案も可能です。";
 
   const followUp =
     missing.length > 0
@@ -219,18 +242,22 @@ export async function createVendorApplication(app: VendorApplication) {
     country: app.company.country,
     summary: app.company.summary,
     services: app.company.services,
+    portfolio_projects: app.company.portfolioProjects,
     min_rate: app.company.minRate,
     max_rate: app.company.maxRate,
     team_size: app.company.teamSize,
     english_level: app.company.english,
     japanese_support: app.company.japaneseSupport,
     plan_key: app.company.plan,
+    preferred_language: app.company.preferredLanguage,
     website_url: app.company.websiteUrl,
     public_contact_email: app.company.publicContactEmail,
     public_contact_phone: app.company.publicContactPhone,
     contact_name: app.contactName,
     contact_email: app.contactEmail,
-    status: "pending"
+    status: "pending",
+    terms_accepted_at: app.termsAcceptedAt,
+    terms_version: app.termsVersion
   };
   const { data, error } = await client.from("vendor_applications").insert(payload).select("*").single();
   if (error || !data) {
@@ -255,7 +282,7 @@ export async function getCompanyProfile(companyId: string) {
 
 export async function updateCompanyProfile(
   companyId: string,
-  patch: Pick<Company, "summary" | "websiteUrl" | "publicContactEmail" | "publicContactPhone">
+  patch: Pick<Company, "summary" | "websiteUrl" | "publicContactEmail" | "publicContactPhone" | "preferredLanguage" | "portfolioProjects">
 ) {
   if (!isSupabaseConfigured()) return mockDb.updateCompany(companyId, patch);
 
@@ -266,7 +293,9 @@ export async function updateCompanyProfile(
     summary: patch.summary,
     website_url: patch.websiteUrl,
     public_contact_email: patch.publicContactEmail,
-    public_contact_phone: patch.publicContactPhone
+    public_contact_phone: patch.publicContactPhone,
+    preferred_language: patch.preferredLanguage,
+    portfolio_projects: patch.portfolioProjects
   };
 
   const { data: profile } = await client.from("vendor_profiles").update(payload).eq("id", companyId).select("*").maybeSingle();
@@ -300,16 +329,89 @@ export async function reviewVendorApplication(id: string, decision: "approved" |
         country: data.country,
         summary: data.summary,
         services: data.services ?? [],
+        portfolio_projects: data.portfolio_projects ?? [],
         min_rate: data.min_rate,
         max_rate: data.max_rate,
         team_size: data.team_size,
         english_level: data.english_level,
         japanese_support: data.japanese_support,
-        plan_key: data.plan_key
+        plan_key: data.plan_key,
+        preferred_language: data.preferred_language
       });
     }
   }
   return toVendorApplication(data as Record<string, unknown>);
+}
+
+export async function getVendorBillingAccount(companyId: string) {
+  if (!isSupabaseConfigured()) return mockDb.getBillingAccount(companyId);
+
+  const client = serviceClient();
+  if (!client) return mockDb.getBillingAccount(companyId);
+  const { data } = await client.from("vendor_billing_accounts").select("*").eq("company_id", companyId).maybeSingle();
+  if (!data) return null;
+  return toBillingAccount(data as Record<string, unknown>);
+}
+
+export async function createPendingBillingAccount(application: VendorApplication) {
+  if (!isSupabaseConfigured()) return mockDb.createPendingBillingAccount(application);
+
+  const client = serviceClient();
+  if (!client) return mockDb.createPendingBillingAccount(application);
+  const { data, error } = await client
+    .from("vendor_billing_accounts")
+    .insert({
+      company_id: application.company.id,
+      application_id: application.id,
+      company_name: application.company.name,
+      contact_email: application.contactEmail,
+      plan_key: application.company.plan,
+      translation_enabled: application.company.plan === "translation",
+      monthly_price_jpy: application.company.plan === "translation" ? 10000 : 5000,
+      status: "pending_checkout",
+      terms_accepted_at: application.termsAcceptedAt,
+      terms_version: application.termsVersion
+    })
+    .select("*")
+    .single();
+  if (error || !data) return null;
+  return toBillingAccount(data as Record<string, unknown>);
+}
+
+export async function activateVendorBillingAccount(applicationId: string) {
+  if (!isSupabaseConfigured()) return mockDb.activateBillingAccount(applicationId);
+
+  const client = serviceClient();
+  if (!client) return mockDb.activateBillingAccount(applicationId);
+  const { data, error } = await client
+    .from("vendor_billing_accounts")
+    .update({
+      status: "active",
+      current_period_end: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString()
+    })
+    .eq("application_id", applicationId)
+    .select("*")
+    .single();
+  if (error || !data) return null;
+  return toBillingAccount(data as Record<string, unknown>);
+}
+
+export async function updateVendorBillingStatus(companyId: string, action: "pause" | "resume" | "cancel") {
+  if (!isSupabaseConfigured()) return mockDb.updateBillingStatus(companyId, action);
+
+  const client = serviceClient();
+  if (!client) return mockDb.updateBillingStatus(companyId, action);
+
+  const payload =
+    action === "pause"
+      ? { status: "paused", pause_requested_at: new Date().toISOString() }
+      : action === "resume"
+        ? { status: "active", pause_requested_at: null }
+        : { status: "canceled", canceled_at: new Date().toISOString() };
+
+  const { data, error } = await client.from("vendor_billing_accounts").update(payload).eq("company_id", companyId).select("*").single();
+  if (error || !data) return null;
+  return toBillingAccount(data as Record<string, unknown>);
 }
 
 export async function runMatching(text: string, limit = 6) {
@@ -350,4 +452,14 @@ export async function listMessagesByThread(threadId: string) {
 export async function addMessageToThread(threadId: string, sender: "buyer" | "vendor", body: string) {
   if (!isSupabaseConfigured()) return mockDb.addMessage(threadId, sender, body);
   return mockDb.addMessage(threadId, sender, body);
+}
+
+export async function getDealByThread(threadId: string) {
+  if (!isSupabaseConfigured()) return mockDb.getDeal(threadId);
+  return mockDb.getDeal(threadId);
+}
+
+export async function updateDealByThread(threadId: string, input: { status: DealStatus; updatedBy: "buyer" | "vendor"; title?: string }) {
+  if (!isSupabaseConfigured()) return mockDb.upsertDeal(threadId, input);
+  return mockDb.upsertDeal(threadId, input);
 }

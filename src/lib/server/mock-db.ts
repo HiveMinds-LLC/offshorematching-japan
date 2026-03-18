@@ -1,18 +1,10 @@
 import { MOCK_COMPANIES, SEED_BUYER_ORGANIZATIONS, SEED_VENDOR_APPLICATIONS } from "@/lib/data/mockData";
-import type { BuyerOrganization, Company, VendorApplication } from "@/lib/domain/types";
+import type { BuyerOrganization, Company, DealRecord, DealStatus, MessageRecord, VendorApplication, VendorBillingAccount, VendorPreferredLanguage } from "@/lib/domain/types";
 
 export type MockThread = {
   id: string;
   buyerEmail: string;
   vendorCompanyId: string;
-  createdAt: string;
-};
-
-export type MockMessage = {
-  id: string;
-  threadId: string;
-  sender: "buyer" | "vendor";
-  body: string;
   createdAt: string;
 };
 
@@ -22,11 +14,56 @@ const state = {
   buyers: [...SEED_BUYER_ORGANIZATIONS] as BuyerOrganization[],
   sessions: new Map<string, string>(),
   threads: [] as MockThread[],
-  messages: [] as MockMessage[]
+  messages: [] as MessageRecord[],
+  deals: new Map<string, DealRecord>(),
+  billingAccounts: new Map<string, VendorBillingAccount>(
+    SEED_VENDOR_APPLICATIONS.map((application) => [
+      application.company.id,
+      {
+        companyId: application.company.id,
+        applicationId: application.id,
+        companyName: application.company.name,
+        contactEmail: application.contactEmail,
+        plan: application.company.plan,
+        translationEnabled: application.company.plan === "translation",
+        monthlyPriceJpy: application.company.plan === "translation" ? 10000 : 5000,
+        status: "active",
+        termsAcceptedAt: application.termsAcceptedAt,
+        termsVersion: application.termsVersion,
+        currentPeriodEnd: new Date("2026-04-30T00:00:00Z").toISOString(),
+        stripeCustomerId: `cus_mock_${application.company.id}`,
+        stripeSubscriptionId: `sub_mock_${application.company.id}`
+      }
+    ])
+  )
 };
 
 function id(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function companyLangForCountry(country: string): VendorPreferredLanguage {
+  const lower = country.toLowerCase();
+  if (lower.includes("japan")) return "ja";
+  if (lower.includes("vietnam")) return "vi";
+  if (lower.includes("indonesia")) return "id";
+  if (lower.includes("thailand")) return "th";
+  if (lower.includes("poland")) return "pl";
+  if (lower.includes("romania")) return "ro";
+  if (lower.includes("korea")) return "ko";
+  if (lower.includes("india")) return "hi";
+  if (lower.includes("ukraine")) return "uk";
+  if (lower.includes("estonia")) return "et";
+  if (lower.includes("chile")) return "es";
+  if (lower.includes("malaysia")) return "ms";
+  if (lower.includes("philippines")) return "tl";
+  return "en";
+}
+
+function makeTranslatedText(body: string, target: string) {
+  if (target === "ja") return `[JA] ${body}`;
+  if (target === "en") return `[EN] ${body}`;
+  return `[${target.toUpperCase()}] ${body}`;
 }
 
 export const mockDb = {
@@ -91,6 +128,60 @@ export const mockDb = {
     state.vendorApplications.unshift(app);
     return app;
   },
+  upsertBillingAccount(account: VendorBillingAccount) {
+    state.billingAccounts.set(account.companyId, account);
+    return account;
+  },
+  getBillingAccount(companyId: string) {
+    return state.billingAccounts.get(companyId) ?? null;
+  },
+  getBillingAccountByApplicationId(applicationId: string) {
+    return [...state.billingAccounts.values()].find((entry) => entry.applicationId === applicationId) ?? null;
+  },
+  createPendingBillingAccount(application: VendorApplication) {
+    const account: VendorBillingAccount = {
+      companyId: application.company.id,
+      applicationId: application.id,
+      companyName: application.company.name,
+      contactEmail: application.contactEmail,
+      plan: application.company.plan,
+      translationEnabled: application.company.plan === "translation",
+      monthlyPriceJpy: application.company.plan === "translation" ? 10000 : 5000,
+      status: "pending_checkout",
+      termsAcceptedAt: application.termsAcceptedAt,
+      termsVersion: application.termsVersion
+    };
+    state.billingAccounts.set(account.companyId, account);
+    return account;
+  },
+  activateBillingAccount(applicationId: string) {
+    const account = this.getBillingAccountByApplicationId(applicationId);
+    if (!account) return null;
+    const next = {
+      ...account,
+      status: "active" as const,
+      currentPeriodEnd: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString()
+    };
+    state.billingAccounts.set(next.companyId, next);
+    return next;
+  },
+  updateBillingStatus(companyId: string, action: "pause" | "resume" | "cancel") {
+    const account = state.billingAccounts.get(companyId);
+    if (!account) return null;
+    if (action === "pause") {
+      const next = { ...account, status: "paused" as const, pauseRequestedAt: new Date().toISOString() };
+      state.billingAccounts.set(companyId, next);
+      return next;
+    }
+    if (action === "resume") {
+      const next = { ...account, status: "active" as const, pauseRequestedAt: undefined };
+      state.billingAccounts.set(companyId, next);
+      return next;
+    }
+    const next = { ...account, status: "canceled" as const, canceledAt: new Date().toISOString() };
+    state.billingAccounts.set(companyId, next);
+    return next;
+  },
   reviewApplication(idValue: string, status: VendorApplication["status"]) {
     const target = state.vendorApplications.find((v) => v.id === idValue);
     if (!target) return null;
@@ -99,6 +190,7 @@ export const mockDb = {
     if (status === "approved") {
       const exists = state.companies.some((c) => c.id === target.company.id);
       if (!exists) state.companies.unshift(target.company);
+      if (!state.billingAccounts.has(target.company.id)) this.createPendingBillingAccount(target);
     }
     return target;
   },
@@ -107,6 +199,12 @@ export const mockDb = {
     if (!thread) {
       thread = { id: id("thread"), buyerEmail, vendorCompanyId, createdAt: new Date().toISOString() };
       state.threads.unshift(thread);
+      state.deals.set(thread.id, {
+        threadId: thread.id,
+        status: "相談中",
+        updatedAt: thread.createdAt,
+        updatedBy: "buyer"
+      });
     }
     return thread;
   },
@@ -119,11 +217,46 @@ export const mockDb = {
   getThreadById(threadId: string) {
     return state.threads.find((t) => t.id === threadId) ?? null;
   },
+  getDeal(threadId: string) {
+    return state.deals.get(threadId) ?? null;
+  },
+  upsertDeal(threadId: string, patch: { status: DealStatus; updatedBy: "buyer" | "vendor"; title?: string }) {
+    const current = state.deals.get(threadId);
+    const next: DealRecord = {
+      threadId,
+      title: patch.title ?? current?.title,
+      status: patch.status,
+      updatedAt: new Date().toISOString(),
+      updatedBy: patch.updatedBy
+    };
+    state.deals.set(threadId, next);
+    return next;
+  },
   listMessages(threadId: string) {
     return state.messages.filter((m) => m.threadId === threadId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   },
   addMessage(threadId: string, sender: "buyer" | "vendor", body: string) {
-    const message = { id: id("msg"), threadId, sender, body, createdAt: new Date().toISOString() };
+    const thread = state.threads.find((entry) => entry.id === threadId);
+    const vendorCompany = state.companies.find((entry) => entry.id === thread?.vendorCompanyId);
+    const companyLanguage = vendorCompany?.preferredLanguage ?? (vendorCompany ? companyLangForCountry(vendorCompany.country) : "en");
+    const billingAccount = vendorCompany ? state.billingAccounts.get(vendorCompany.id) : null;
+    const translationEnabled = billingAccount?.translationEnabled ?? vendorCompany?.plan === "translation";
+    const originalLanguage = sender === "buyer" ? "ja" : companyLanguage;
+    const message: MessageRecord = {
+      id: id("msg"),
+      threadId,
+      sender,
+      body,
+      originalLanguage,
+      translations: translationEnabled
+        ? {
+            ja: originalLanguage === "ja" ? body : makeTranslatedText(body, "ja"),
+            en: originalLanguage === "en" ? body : makeTranslatedText(body, "en"),
+            company: originalLanguage === companyLanguage ? body : makeTranslatedText(body, companyLanguage)
+          }
+        : {},
+      createdAt: new Date().toISOString()
+    };
     state.messages.push(message);
     return message;
   }

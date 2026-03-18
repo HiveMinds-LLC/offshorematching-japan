@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { useLocale } from "@/components/i18n/locale-provider";
 import { ImagePlaceholder } from "@/components/marketing/image-placeholder";
 import { SectionReveal } from "@/components/marketing/section-reveal";
 import { SiteFooter } from "@/components/marketing/site-footer";
@@ -20,6 +21,29 @@ const flow = [
 ];
 
 export default function BuyerMarketPage() {
+  const { locale } = useLocale();
+  const benefits = locale === "ja"
+    ? [
+        "比較工数を削減し、候補選定を高速化",
+        "要件相談から候補抽出まで一画面で完結",
+        "審査済み企業の中から安心して選べる"
+      ]
+    : [
+        "Reduce comparison effort and shortlist faster",
+        "Go from requirements to candidates in one flow",
+        "Choose from reviewed companies with more confidence"
+      ];
+  const flow = locale === "ja"
+    ? [
+        { title: "相談入力", text: "必要技術・予算・体制をチャットで入力" },
+        { title: "候補比較", text: "候補会社を比較し、優先度を整理" },
+        { title: "商談開始", text: "そのまま企業間メッセージで連絡" }
+      ]
+    : [
+        { title: "Enter requirements", text: "Describe the needed tech, budget, and delivery setup in chat." },
+        { title: "Compare vendors", text: "Review candidate companies and prioritize them." },
+        { title: "Start the conversation", text: "Move directly into company-to-company messaging." }
+      ];
   return (
     <div>
       <SiteNav />
@@ -29,16 +53,26 @@ export default function BuyerMarketPage() {
             <div>
               <p className="inline-flex rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-semibold text-blue-700">FOR BUYERS</p>
               <h1 className="mt-5 font-[family-name:var(--font-display)] text-4xl font-extrabold leading-[1.1] text-slate-900 sm:text-5xl">
-                発注企業向け
-                <br />
-                パートナー探索ページ
+                {locale === "ja" ? (
+                  <>
+                    発注企業向け
+                    <br />
+                    パートナー探索ページ
+                  </>
+                ) : (
+                  <>
+                    Buyer-facing
+                    <br />
+                    partner discovery page
+                  </>
+                )}
               </h1>
               <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-                候補探索から要件整理、メッセージでの初回連絡まで。調達チームが必要とする初期検討プロセスを一気通貫でサポートします。
+                {locale === "ja" ? "候補探索から要件整理、メッセージでの初回連絡まで。調達チームが必要とする初期検討プロセスを一気通貫でサポートします。" : "From discovery to requirements clarification and first contact, this flow supports the early-stage evaluation work procurement teams actually need."}
               </p>
             </div>
             <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl">
-              <ImagePlaceholder label="発注企業向けUI" hint="例: 要件入力・候補比較・メッセージ画面" />
+              <ImagePlaceholder label={locale === "ja" ? "発注企業向けUI" : "Buyer UI"} hint={locale === "ja" ? "例: 要件入力・候補比較・メッセージ画面" : "Example: requirement input, vendor comparison, and messaging"} />
             </div>
           </div>
         </section>
@@ -47,7 +81,7 @@ export default function BuyerMarketPage() {
           <div className="mx-auto grid w-full max-w-7xl gap-4 md:grid-cols-3">
             {benefits.map((item) => (
               <article key={item} className="panel p-8">
-                <p className="text-xs font-semibold tracking-wide text-blue-700">BENEFIT</p>
+                <p className="text-xs font-semibold tracking-wide text-blue-700">{locale === "ja" ? "BENEFIT" : "BENEFIT"}</p>
                 <p className="mt-3 text-lg leading-8 text-slate-800">{item}</p>
               </article>
             ))}
@@ -56,7 +90,7 @@ export default function BuyerMarketPage() {
 
         <SectionReveal className="px-4 pb-24">
           <div className="mx-auto w-full max-w-7xl rounded-[28px] border border-slate-200 bg-white p-10">
-            <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold text-slate-900 sm:text-4xl">導入フロー</h2>
+            <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold text-slate-900 sm:text-4xl">{locale === "ja" ? "導入フロー" : "Flow"}</h2>
             <div className="mt-7 grid gap-4 md:grid-cols-3">
               {flow.map((step, i) => (
                 <article key={step.title} className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
@@ -67,8 +101,8 @@ export default function BuyerMarketPage() {
               ))}
             </div>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/app" className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700">アプリで相談開始</Link>
-              <Link href="/pricing" className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">料金を見る</Link>
+              <Link href="/app" className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700">{locale === "ja" ? "アプリで相談開始" : "Start in the App"}</Link>
+              <Link href="/pricing" className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">{locale === "ja" ? "料金を見る" : "View Pricing"}</Link>
             </div>
           </div>
         </SectionReveal>

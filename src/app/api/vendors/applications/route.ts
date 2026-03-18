@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import type { Company, VendorApplication } from "@/lib/domain/types";
+import { TERMS_VERSION } from "@/lib/legal";
 import { createVendorApplication, listVendorApplications } from "@/lib/server/api-store";
 
 function makeId(prefix: string) {
@@ -19,8 +20,12 @@ export async function POST(request: Request) {
   const name = String(body.name ?? "").trim();
   const contactEmail = String(body.contactEmail ?? "").trim();
   const summary = String(body.summary ?? "").trim();
+  const acceptedTerms = body.acceptedTerms === true;
   if (!name || !contactEmail || !summary) {
     return NextResponse.json({ error: "必須項目を入力してください。" }, { status: 400 });
+  }
+  if (!acceptedTerms) {
+    return NextResponse.json({ error: "利用規約と請求条件への同意が必要です。" }, { status: 400 });
   }
 
   const services = String(body.servicesCsv ?? "")
@@ -32,12 +37,14 @@ export async function POST(request: Request) {
     id: makeId("c"),
     name,
     country: String(body.country ?? "Unknown"),
-    plan: "developer",
+    plan: body.plan === "translation" ? "translation" : "basic",
     websiteUrl: String(body.websiteUrl ?? "").trim() || undefined,
     publicContactEmail: String(body.publicContactEmail ?? body.contactEmail ?? "").trim() || undefined,
     publicContactPhone: String(body.publicContactPhone ?? "").trim() || undefined,
+    preferredLanguage: body.preferredLanguage ? String(body.preferredLanguage) as Company["preferredLanguage"] : undefined,
     summary,
     services,
+    portfolioProjects: [],
     minRate: Number(body.minRate ?? 20),
     maxRate: Number(body.maxRate ?? 40),
     teamSize: Number(body.teamSize ?? 10),
@@ -51,7 +58,9 @@ export async function POST(request: Request) {
     contactName: String(body.contactName ?? "N/A"),
     contactEmail,
     status: "pending",
-    submittedAt: new Date().toISOString()
+    submittedAt: new Date().toISOString(),
+    termsAcceptedAt: new Date().toISOString(),
+    termsVersion: TERMS_VERSION
   };
   const created = await createVendorApplication(application);
   if (!created) return NextResponse.json({ error: "申請の保存に失敗しました。" }, { status: 500 });

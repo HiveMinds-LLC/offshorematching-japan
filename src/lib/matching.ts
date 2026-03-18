@@ -1,4 +1,4 @@
-import type { BuyerCriteria, Company } from "@/lib/domain/types";
+import type { BuyerCriteria, Company, MatchResult } from "@/lib/domain/types";
 
 const KEYWORDS = [
   "react",
@@ -49,33 +49,52 @@ export function parseCriteria(input: string): BuyerCriteria {
   return criteria;
 }
 
-function scoreCompany(company: Company, criteria: BuyerCriteria): number {
+function scoreCompany(company: Company, criteria: BuyerCriteria) {
   let score = 10;
+  const reasons: string[] = [];
 
   if (criteria.technologies.length) {
     const tech = company.services.map((v) => v.toLowerCase());
     const overlap = criteria.technologies.filter((needle) => tech.some((t) => t.includes(needle))).length;
     score += overlap * 12;
+    if (overlap > 0) reasons.push(`技術一致 ${overlap}件`);
   }
 
   if (criteria.budgetCeiling !== null) {
-    if (company.minRate <= criteria.budgetCeiling) score += 16;
+    if (company.minRate <= criteria.budgetCeiling) {
+      score += 16;
+      reasons.push("予算条件に適合");
+    }
     if (company.maxRate > criteria.budgetCeiling) score -= 4;
   }
 
   if (criteria.teamNeeded !== null) {
-    score += company.teamSize >= criteria.teamNeeded ? 8 : -6;
+    if (company.teamSize >= criteria.teamNeeded) {
+      score += 8;
+      reasons.push("必要人数を満たす");
+    } else {
+      score -= 6;
+    }
   }
 
-  if (criteria.englishRequired && company.english === "high") score += 8;
-  if (criteria.japaneseRequired && company.japaneseSupport !== "basic") score += 6;
+  if (criteria.englishRequired && company.english === "high") {
+    score += 8;
+    reasons.push("英語対応が強い");
+  }
+  if (criteria.japaneseRequired && company.japaneseSupport !== "basic") {
+    score += 6;
+    reasons.push("日本語対応あり");
+  }
 
-  return Math.max(0, score);
+  return { score: Math.max(0, score), reasons };
 }
 
-export function runTierAwareMatch(companies: Company[], criteria: BuyerCriteria, _unusedBoostMap = {}, limit = 6) {
+export function runTierAwareMatch(companies: Company[], criteria: BuyerCriteria, _unusedBoostMap = {}, limit = 6): MatchResult[] {
   return companies
-    .map((company) => ({ company, score: scoreCompany(company, criteria) }))
+    .map((company) => {
+      const result = scoreCompany(company, criteria);
+      return { company, score: result.score, reasons: result.reasons };
+    })
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 }

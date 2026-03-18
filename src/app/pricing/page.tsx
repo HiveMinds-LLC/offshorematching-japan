@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 
+import { useLocale } from "@/components/i18n/locale-provider";
 import { ImagePlaceholder } from "@/components/marketing/image-placeholder";
 import { SectionReveal } from "@/components/marketing/section-reveal";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { SiteNav } from "@/components/marketing/site-nav";
 
 export default function PricingPage() {
+  const { locale } = useLocale();
   return (
     <div>
       <SiteNav />
@@ -17,42 +19,66 @@ export default function PricingPage() {
             <div>
               <p className="inline-flex rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-semibold text-blue-700">PRICING</p>
               <h1 className="mt-5 font-[family-name:var(--font-display)] text-4xl font-extrabold leading-[1.1] text-slate-900 sm:text-5xl">
-                料金はシンプル、
-                <br />
-                運用は本格的。
+                {locale === "ja" ? (
+                  <>
+                    料金はシンプル、
+                    <br />
+                    運用は本格的。
+                  </>
+                ) : (
+                  <>
+                    Simple pricing,
+                    <br />
+                    serious operations.
+                  </>
+                )}
               </h1>
               <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-                開発会社は月額5,000円で掲載。発注企業は無料で候補探索・相談・メッセージ機能を利用できます。
+                {locale === "ja"
+                  ? "開発会社は月額5,000円のベーシック掲載、または月額10,000円の翻訳付き掲載を選択できます。発注企業は無料で候補探索・相談・メッセージ機能を利用できます。"
+                  : "Vendors can choose a basic listing at JPY 5,000 per month or a translation-enabled listing at JPY 10,000 per month. Buyers can browse, consult, and message for free."}
               </p>
             </div>
             <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl">
-              <ImagePlaceholder label="料金ページビジュアル" hint="例: 料金カード + 審査フロー図" />
+              <ImagePlaceholder label={locale === "ja" ? "料金ページビジュアル" : "Pricing Visual"} hint={locale === "ja" ? "例: 料金カード + 審査フロー図" : "Example: pricing cards + approval flow diagram"} />
             </div>
           </div>
         </section>
 
         <SectionReveal className="px-4 pb-20">
-          <div className="mx-auto grid w-full max-w-7xl gap-5 md:grid-cols-2">
+          <div className="mx-auto grid w-full max-w-7xl gap-5 md:grid-cols-3">
             <article className="panel border-blue-100 bg-blue-50 p-9">
-              <p className="text-xs font-semibold tracking-wide text-blue-700">開発会社向け</p>
+              <p className="text-xs font-semibold tracking-wide text-blue-700">{locale === "ja" ? "開発会社向け" : "For Vendors"}</p>
               <p className="mt-2 font-[family-name:var(--font-display)] text-4xl font-extrabold text-slate-900 sm:text-5xl">¥5,000</p>
-              <p className="mt-1 text-sm font-semibold text-slate-600">/ 月</p>
+              <p className="mt-1 text-sm font-semibold text-slate-600">{locale === "ja" ? "/ 月" : "/ month"}</p>
               <ul className="mt-6 grid gap-2 text-sm leading-7 text-slate-700">
-                <li>会社プロフィール公開</li>
-                <li>公開連絡先・Webサイト掲載</li>
-                <li>発注企業からの問い合わせ受信</li>
-                <li>管理者審査後に公開開始</li>
+                <li>{locale === "ja" ? "会社プロフィール公開" : "Public company profile"}</li>
+                <li>{locale === "ja" ? "公開連絡先・Webサイト掲載" : "Public contact info and website"}</li>
+                <li>{locale === "ja" ? "発注企業からの問い合わせ受信" : "Inbound buyer inquiries"}</li>
+                <li>{locale === "ja" ? "通常チャット" : "Standard chat"}</li>
+                <li>{locale === "ja" ? "管理者審査後に公開開始" : "Published after admin approval"}</li>
               </ul>
             </article>
             <article className="panel border-emerald-100 bg-emerald-50 p-9">
-              <p className="text-xs font-semibold tracking-wide text-emerald-700">発注企業向け</p>
-              <p className="mt-2 font-[family-name:var(--font-display)] text-4xl font-extrabold text-slate-900 sm:text-5xl">無料</p>
-              <p className="mt-1 text-sm font-semibold text-slate-600">/ 月</p>
+              <p className="text-xs font-semibold tracking-wide text-emerald-700">{locale === "ja" ? "開発会社向け 翻訳付き" : "For Vendors with Translation"}</p>
+              <p className="mt-2 font-[family-name:var(--font-display)] text-4xl font-extrabold text-slate-900 sm:text-5xl">¥10,000</p>
+              <p className="mt-1 text-sm font-semibold text-slate-600">{locale === "ja" ? "/ 月" : "/ month"}</p>
               <ul className="mt-6 grid gap-2 text-sm leading-7 text-slate-700">
-                <li>公開ディレクトリの閲覧</li>
-                <li>要件相談チャット</li>
-                <li>候補企業比較</li>
-                <li>企業間メッセージ機能</li>
+                <li>{locale === "ja" ? "ベーシックの全機能" : "Everything in Basic"}</li>
+                <li>{locale === "ja" ? "原文 + 翻訳付きチャット" : "Original + translated chat"}</li>
+                <li>{locale === "ja" ? "会社設定の優先言語に自動翻訳" : "Auto-translation into the company language"}</li>
+                <li>{locale === "ja" ? "海外チームでも日本企業とやり取りしやすい" : "Easier communication with Japanese buyers"}</li>
+              </ul>
+            </article>
+            <article className="panel border-emerald-100 bg-emerald-50 p-9">
+              <p className="text-xs font-semibold tracking-wide text-emerald-700">{locale === "ja" ? "発注企業向け" : "For Buyers"}</p>
+              <p className="mt-2 font-[family-name:var(--font-display)] text-4xl font-extrabold text-slate-900 sm:text-5xl">{locale === "ja" ? "無料" : "Free"}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-600">{locale === "ja" ? "/ 月" : "/ month"}</p>
+              <ul className="mt-6 grid gap-2 text-sm leading-7 text-slate-700">
+                <li>{locale === "ja" ? "公開ディレクトリの閲覧" : "Browse the public directory"}</li>
+                <li>{locale === "ja" ? "要件相談チャット" : "Requirement consultation chat"}</li>
+                <li>{locale === "ja" ? "候補企業比較" : "Compare candidate vendors"}</li>
+                <li>{locale === "ja" ? "企業間メッセージ機能" : "Company-to-company messaging"}</li>
               </ul>
             </article>
           </div>
@@ -60,30 +86,30 @@ export default function PricingPage() {
 
         <SectionReveal className="px-4 pb-24">
           <div className="mx-auto w-full max-w-7xl rounded-[28px] bg-slate-900 px-8 py-12 text-white">
-            <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold sm:text-4xl">審査フロー</h2>
+            <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold sm:text-4xl">{locale === "ja" ? "審査フロー" : "Approval Flow"}</h2>
             <div className="mt-7 grid gap-4 md:grid-cols-3">
               <article className="rounded-2xl border border-white/15 bg-white/5 p-5">
                 <p className="text-xs font-semibold tracking-wide text-cyan-300">STEP 1</p>
-                <p className="mt-2 text-lg font-semibold">掲載申請</p>
-                <p className="mt-2 text-sm leading-7 text-slate-300">開発会社がプロフィールと連絡先を登録。</p>
+                <p className="mt-2 text-lg font-semibold">{locale === "ja" ? "掲載申請" : "Application"}</p>
+                <p className="mt-2 text-sm leading-7 text-slate-300">{locale === "ja" ? "開発会社がプロフィールと連絡先を登録。" : "The vendor submits a company profile and contact details."}</p>
               </article>
               <article className="rounded-2xl border border-white/15 bg-white/5 p-5">
                 <p className="text-xs font-semibold tracking-wide text-cyan-300">STEP 2</p>
-                <p className="mt-2 text-lg font-semibold">管理者審査</p>
-                <p className="mt-2 text-sm leading-7 text-slate-300">管理者が内容を確認して承認/却下。</p>
+                <p className="mt-2 text-lg font-semibold">{locale === "ja" ? "管理者審査" : "Admin Review"}</p>
+                <p className="mt-2 text-sm leading-7 text-slate-300">{locale === "ja" ? "管理者が内容を確認して承認/却下。" : "An administrator reviews and approves or rejects the listing."}</p>
               </article>
               <article className="rounded-2xl border border-white/15 bg-white/5 p-5">
                 <p className="text-xs font-semibold tracking-wide text-cyan-300">STEP 3</p>
-                <p className="mt-2 text-lg font-semibold">公開と商談</p>
-                <p className="mt-2 text-sm leading-7 text-slate-300">承認後、発注企業から問い合わせ受信。</p>
+                <p className="mt-2 text-lg font-semibold">{locale === "ja" ? "公開と商談" : "Go Live and Start Talks"}</p>
+                <p className="mt-2 text-sm leading-7 text-slate-300">{locale === "ja" ? "承認後、発注企業から問い合わせ受信。" : "Once approved, the vendor can receive buyer inquiries."}</p>
               </article>
             </div>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/app/register/vendor" className="rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-100">
-                開発会社として申請
+                {locale === "ja" ? "開発会社として申請" : "Apply as a Vendor"}
               </Link>
               <Link href="/app/register/buyer" className="rounded-2xl border border-white/30 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10">
-                発注企業として登録
+                {locale === "ja" ? "発注企業として登録" : "Register as a Buyer"}
               </Link>
             </div>
           </div>

@@ -28,3 +28,15 @@ export const TECH_FILTER_OPTIONS = [
   "blockchain",
   "社内業務ソフト"
 ] as const;
+
+export const PROJECT_FILTER_OPTIONS = [
+  "Webサービス",
+  "EC / マーケットプレイス",
+  "社内システム / 業務改善",
+  "モバイルアプリ",
+  "SaaS / 業務ツール",
+  "ERP / 基幹連携",
+  "AI / データ活用",
+  "VR / AR / 3D",
+  "保守 / 運用改善"
+] as const;

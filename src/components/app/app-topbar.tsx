@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { LanguageSwitcher } from "@/components/i18n/language-switcher";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type AppTopbarProps = {
   title: string;
@@ -8,6 +10,7 @@ type AppTopbarProps = {
 };
 
 export function AppTopbar({ title, subtitle }: AppTopbarProps) {
+  const { locale } = useLocale();
   return (
     <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur">
       <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3">
@@ -20,8 +23,9 @@ export function AppTopbar({ title, subtitle }: AppTopbarProps) {
           </span>
         </div>
         <div className="flex items-center gap-2">
+          <LanguageSwitcher />
           <Link href="/" className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-            ホーム
+            {locale === "ja" ? "ホーム" : "Home"}
           </Link>
         </div>
       </div>

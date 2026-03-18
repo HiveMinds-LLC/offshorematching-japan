@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { useLocale } from "@/components/i18n/locale-provider";
 import { ImagePlaceholder } from "@/components/marketing/image-placeholder";
 import { SectionReveal } from "@/components/marketing/section-reveal";
 import { SiteFooter } from "@/components/marketing/site-footer";
@@ -20,6 +21,29 @@ const requirements = [
 ];
 
 export default function VendorMarketPage() {
+  const { locale } = useLocale();
+  const benefits = locale === "ja"
+    ? [
+        "日本企業からの相談に継続露出",
+        "月額5,000円で会社情報を公開",
+        "審査通過企業として信頼性を提示"
+      ]
+    : [
+        "Ongoing exposure to Japanese buyers",
+        "Publish company information from JPY 5,000 per month",
+        "Present trust as a reviewed vendor"
+      ];
+  const requirements = locale === "ja"
+    ? [
+        { title: "会社情報", text: "会社紹介・Webサイト・公開連絡先を準備" },
+        { title: "対応範囲", text: "技術スタック・単価帯・体制人数を明確化" },
+        { title: "審査", text: "管理者審査後に公開ディレクトリへ掲載" }
+      ]
+    : [
+        { title: "Company profile", text: "Prepare your summary, website, and public contact details." },
+        { title: "Service scope", text: "Clarify your stack, price range, and team capacity." },
+        { title: "Review", text: "Your listing goes live after admin approval." }
+      ];
   return (
     <div>
       <SiteNav />
@@ -29,16 +53,26 @@ export default function VendorMarketPage() {
             <div>
               <p className="inline-flex rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-semibold text-blue-700">FOR VENDORS</p>
               <h1 className="mt-5 font-[family-name:var(--font-display)] text-4xl font-extrabold leading-[1.1] text-slate-900 sm:text-5xl">
-                開発会社向け
-                <br />
-                掲載プログラム
+                {locale === "ja" ? (
+                  <>
+                    開発会社向け
+                    <br />
+                    掲載プログラム
+                  </>
+                ) : (
+                  <>
+                    Vendor-facing
+                    <br />
+                    listing program
+                  </>
+                )}
               </h1>
               <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-                日本企業へ自社の強みを直接届けるための掲載枠です。プロフィール公開、相談受信、メッセージ返信までを統合して運用できます。
+                {locale === "ja" ? "日本企業へ自社の強みを直接届けるための掲載枠です。プロフィール公開、相談受信、メッセージ返信までを統合して運用できます。" : "This listing program helps offshore vendors present their strengths directly to Japanese companies, from profile exposure to inquiry handling and replies."}
               </p>
             </div>
             <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl">
-              <ImagePlaceholder label="開発会社向けUI" hint="例: プロフィール編集・問い合わせ一覧・返信画面" />
+              <ImagePlaceholder label={locale === "ja" ? "開発会社向けUI" : "Vendor UI"} hint={locale === "ja" ? "例: プロフィール編集・問い合わせ一覧・返信画面" : "Example: profile editing, inquiry inbox, and reply screen"} />
             </div>
           </div>
         </section>
@@ -56,7 +90,7 @@ export default function VendorMarketPage() {
 
         <SectionReveal className="px-4 pb-24">
           <div className="mx-auto w-full max-w-7xl rounded-[28px] border border-slate-200 bg-white p-10">
-            <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold text-slate-900 sm:text-4xl">掲載開始まで</h2>
+            <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold text-slate-900 sm:text-4xl">{locale === "ja" ? "掲載開始まで" : "Before You Go Live"}</h2>
             <div className="mt-7 grid gap-4 md:grid-cols-3">
               {requirements.map((item, i) => (
                 <article key={item.title} className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
@@ -68,10 +102,10 @@ export default function VendorMarketPage() {
             </div>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/app/register/vendor" className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700">
-                掲載申請をはじめる
+                {locale === "ja" ? "掲載申請をはじめる" : "Start Your Listing Application"}
               </Link>
               <Link href="/pricing" className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                料金を見る
+                {locale === "ja" ? "料金を見る" : "View Pricing"}
               </Link>
             </div>
           </div>
