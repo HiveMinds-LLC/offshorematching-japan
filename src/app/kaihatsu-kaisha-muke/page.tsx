@@ -11,13 +11,13 @@ import { SiteNav } from "@/components/marketing/site-nav";
 const benefits = [
   "日本企業からの相談に継続露出",
   "月額5,000円で会社情報を公開",
-  "審査通過企業として信頼性を提示"
+  "決済とプロフィール入力完了後にすぐ掲載開始"
 ];
 
 const requirements = [
   { title: "会社情報", text: "会社紹介・Webサイト・公開連絡先を準備" },
   { title: "対応範囲", text: "技術スタック・単価帯・体制人数を明確化" },
-  { title: "審査", text: "管理者審査後に公開ディレクトリへ掲載" }
+  { title: "掲載開始", text: "決済完了と必須プロフィール入力後に公開ディレクトリへ掲載" }
 ];
 
 export default function VendorMarketPage() {
@@ -26,23 +26,23 @@ export default function VendorMarketPage() {
     ? [
         "日本企業からの相談に継続露出",
         "月額5,000円で会社情報を公開",
-        "審査通過企業として信頼性を提示"
+        "決済とプロフィール入力完了後にすぐ掲載開始"
       ]
     : [
         "Ongoing exposure to Japanese buyers",
         "Publish company information from JPY 5,000 per month",
-        "Present trust as a reviewed vendor"
+        "Go live as soon as payment and profile completion are in place"
       ];
   const requirements = locale === "ja"
     ? [
         { title: "会社情報", text: "会社紹介・Webサイト・公開連絡先を準備" },
         { title: "対応範囲", text: "技術スタック・単価帯・体制人数を明確化" },
-        { title: "審査", text: "管理者審査後に公開ディレクトリへ掲載" }
+        { title: "掲載開始", text: "決済完了と必須プロフィール入力後に公開ディレクトリへ掲載" }
       ]
     : [
         { title: "Company profile", text: "Prepare your summary, website, and public contact details." },
         { title: "Service scope", text: "Clarify your stack, price range, and team capacity." },
-        { title: "Review", text: "Your listing goes live after admin approval." }
+        { title: "Go live", text: "Your listing goes live after payment and required profile completion." }
       ];
   return (
     <div>

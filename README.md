@@ -50,8 +50,12 @@ cp .env.example .env.local
 
 Required keys:
 - `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SECRET_KEY` (server only)
+
+Legacy fallback keys are also accepted by the current code:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` (server only)
+- `SUPABASE_SERVICE_ROLE_KEY`
 
 ### Route map
 

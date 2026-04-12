@@ -14,31 +14,47 @@ export type PortfolioProjectType =
 export type PortfolioProject = {
   id: string;
   title: string;
+  titleJa?: string;
   projectType: PortfolioProjectType;
   summary: string;
+  summaryJa?: string;
   durationLabel: string;
+  durationLabelJa?: string;
   budgetLabel: string;
+  budgetLabelJa?: string;
   technologies: string[];
+  technologiesJa?: string[];
   businessImpact: string;
+  businessImpactJa?: string;
 };
 
 export type Company = {
   id: string;
   name: string;
   country: string;
+  contactName?: string;
   plan: PlanKey;
+  active?: boolean;
+  flaggedAt?: string;
+  flagReason?: string;
+  deactivatedAt?: string;
+  deactivationReason?: string;
+  removedAt?: string;
+  removedReason?: string;
   websiteUrl?: string;
   publicContactEmail?: string;
   publicContactPhone?: string;
   preferredLanguage?: VendorPreferredLanguage;
   summary: string;
+  summaryJa?: string;
   services: string[];
   portfolioProjects: PortfolioProject[];
+  completedEngagements?: CompletedEngagementRecord[];
   minRate: number;
   maxRate: number;
   teamSize: number;
-  english: "basic" | "medium" | "high";
-  japaneseSupport: "basic" | "medium" | "high";
+  english: "basic" | "medium" | "high" | "native";
+  japaneseSupport: "basic" | "medium" | "high" | "native";
 };
 
 export type PlanSetting = {
@@ -71,7 +87,7 @@ export type BuyerCriteria = {
   durationMonths: number | null;
 };
 
-export type VendorApplicationStatus = "pending" | "approved" | "rejected";
+export type VendorApplicationStatus = "draft" | "pending" | "changes_requested" | "approved" | "rejected";
 
 export type VendorApplication = {
   id: string;
@@ -80,6 +96,8 @@ export type VendorApplication = {
   contactEmail: string;
   status: VendorApplicationStatus;
   submittedAt: string;
+  lastSubmittedAt?: string;
+  lastResubmittedAt?: string;
   reviewNote?: string;
   termsAcceptedAt?: string;
   termsVersion?: string;
@@ -102,10 +120,13 @@ export type MessageTranslations = {
   company?: string;
 };
 
+export type MessageType = "text" | "system";
+
 export type MessageRecord = {
   id: string;
   threadId: string;
   sender: "buyer" | "vendor";
+  messageType: MessageType;
   body: string;
   originalLanguage: string;
   translations: MessageTranslations;
@@ -126,12 +147,15 @@ export type VendorBillingAccount = {
   companyName: string;
   contactEmail: string;
   plan: PlanKey;
+  pendingPlan?: PlanKey;
+  pendingScheduleId?: string;
   translationEnabled: boolean;
   monthlyPriceJpy: number;
   status: BillingStatus;
   termsAcceptedAt?: string;
   termsVersion?: string;
   currentPeriodEnd?: string;
+  pendingPlanEffectiveAt?: string;
   pauseRequestedAt?: string;
   canceledAt?: string;
   stripeCustomerId?: string;
@@ -153,10 +177,21 @@ export type ProjectHistoryRecord = {
 
 export type DealStatus = "相談中" | "進行中" | "完了";
 
+export type CompletedEngagementRecord = {
+  id: string;
+  title: string;
+  summary: string;
+  completedAt: string;
+};
+
 export type DealRecord = {
   threadId: string;
   title?: string;
   status: DealStatus;
   updatedAt: string;
   updatedBy: "buyer" | "vendor";
+  proposedStatus?: DealStatus | null;
+  proposedBy?: "buyer" | "vendor" | null;
+  proposalCreatedAt?: string | null;
+  lockedAt?: string | null;
 };

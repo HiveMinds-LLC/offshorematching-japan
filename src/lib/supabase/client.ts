@@ -3,5 +3,6 @@ import { createBrowserClient } from "@supabase/ssr";
 import { supabaseEnv } from "@/lib/supabase/env";
 
 export function createSupabaseBrowserClient() {
-  return createBrowserClient(supabaseEnv.url, supabaseEnv.anonKey);
+  if (!supabaseEnv.url || !supabaseEnv.publishableKey) return null;
+  return createBrowserClient(supabaseEnv.url, supabaseEnv.publishableKey);
 }

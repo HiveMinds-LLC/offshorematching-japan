@@ -1,29 +1,32 @@
 import { NextResponse } from "next/server";
 
-import { createPendingBillingAccount } from "@/lib/server/api-store";
+import { createPendingBillingAccount, getVendorApplicationByUserId } from "@/lib/server/api-store";
 import { createStripeVendorCheckoutSession } from "@/lib/server/stripe";
+import { getCurrentVendorSession } from "@/lib/server/vendor-auth";
 
 function safeOrigin(request: Request) {
   return process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
 }
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => null);
-  if (!body) return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  const vendor = await getCurrentVendorSession();
+  if (!vendor) return NextResponse.json({ error: "開発会社ログインが必要です。" }, { status: 401 });
 
-  const application = body.application;
-  if (!application?.id || !application?.company?.id || !application?.company?.name || !application?.contactEmail) {
-    return NextResponse.json({ error: "申請情報が不足しています。" }, { status: 400 });
+  const application = await getVendorApplicationByUserId(vendor.id);
+  if (!application?.id || !application.company?.id || !application.company?.name || !application.contactEmail) {
+    return NextResponse.json({ error: "請求対象の申請情報が見つかりません。" }, { status: 400 });
   }
 
-  await createPendingBillingAccount(application);
+  const billingAccount = await createPendingBillingAccount(application);
 
   try {
     const stripeSession = await createStripeVendorCheckoutSession({
       applicationId: String(application.id),
       companyId: String(application.company.id),
       companyName: String(application.company.name),
+      contactName: String(application.contactName ?? application.company.contactName ?? application.company.name),
       contactEmail: String(application.contactEmail),
+      stripeCustomerId: billingAccount?.stripeCustomerId,
       plan: application.company.plan === "translation" ? "translation" : "basic",
       origin: safeOrigin(request)
     });
@@ -37,7 +40,5 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-
-  const fallbackUrl = `${safeOrigin(request)}/app/register/vendor/checkout-success?applicationId=${encodeURIComponent(String(application.id))}&mock=1`;
-  return NextResponse.json({ url: fallbackUrl, provider: "mock" });
+  return NextResponse.json({ error: "Stripe 設定が不足しています。" }, { status: 500 });
 }

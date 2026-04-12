@@ -56,7 +56,7 @@ export default function PricingPage() {
                 <li>{locale === "ja" ? "公開連絡先・Webサイト掲載" : "Public contact info and website"}</li>
                 <li>{locale === "ja" ? "発注企業からの問い合わせ受信" : "Inbound buyer inquiries"}</li>
                 <li>{locale === "ja" ? "通常チャット" : "Standard chat"}</li>
-                <li>{locale === "ja" ? "管理者審査後に公開開始" : "Published after admin approval"}</li>
+                <li>{locale === "ja" ? "決済と必須プロフィール入力後に掲載開始" : "Listed after payment and required profile completion"}</li>
               </ul>
             </article>
             <article className="panel border-emerald-100 bg-emerald-50 p-9">
@@ -86,22 +86,22 @@ export default function PricingPage() {
 
         <SectionReveal className="px-4 pb-24">
           <div className="mx-auto w-full max-w-7xl rounded-[28px] bg-slate-900 px-8 py-12 text-white">
-            <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold sm:text-4xl">{locale === "ja" ? "審査フロー" : "Approval Flow"}</h2>
+            <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold sm:text-4xl">{locale === "ja" ? "導入フロー" : "Onboarding Flow"}</h2>
             <div className="mt-7 grid gap-4 md:grid-cols-3">
               <article className="rounded-2xl border border-white/15 bg-white/5 p-5">
                 <p className="text-xs font-semibold tracking-wide text-cyan-300">STEP 1</p>
-                <p className="mt-2 text-lg font-semibold">{locale === "ja" ? "掲載申請" : "Application"}</p>
-                <p className="mt-2 text-sm leading-7 text-slate-300">{locale === "ja" ? "開発会社がプロフィールと連絡先を登録。" : "The vendor submits a company profile and contact details."}</p>
+                <p className="mt-2 text-lg font-semibold">{locale === "ja" ? "アカウント作成" : "Create Account"}</p>
+                <p className="mt-2 text-sm leading-7 text-slate-300">{locale === "ja" ? "開発会社が基本情報を登録し、掲載プランを選択。" : "The vendor registers basic information and chooses a listing plan."}</p>
               </article>
               <article className="rounded-2xl border border-white/15 bg-white/5 p-5">
                 <p className="text-xs font-semibold tracking-wide text-cyan-300">STEP 2</p>
-                <p className="mt-2 text-lg font-semibold">{locale === "ja" ? "管理者審査" : "Admin Review"}</p>
-                <p className="mt-2 text-sm leading-7 text-slate-300">{locale === "ja" ? "管理者が内容を確認して承認/却下。" : "An administrator reviews and approves or rejects the listing."}</p>
+                <p className="mt-2 text-lg font-semibold">{locale === "ja" ? "決済とプロフィール入力" : "Payment and Profile Setup"}</p>
+                <p className="mt-2 text-sm leading-7 text-slate-300">{locale === "ja" ? "月額決済を完了し、会社プロフィールの必須項目を入力。" : "Complete monthly billing and fill in the required public profile details."}</p>
               </article>
               <article className="rounded-2xl border border-white/15 bg-white/5 p-5">
                 <p className="text-xs font-semibold tracking-wide text-cyan-300">STEP 3</p>
-                <p className="mt-2 text-lg font-semibold">{locale === "ja" ? "公開と商談" : "Go Live and Start Talks"}</p>
-                <p className="mt-2 text-sm leading-7 text-slate-300">{locale === "ja" ? "承認後、発注企業から問い合わせ受信。" : "Once approved, the vendor can receive buyer inquiries."}</p>
+                <p className="mt-2 text-lg font-semibold">{locale === "ja" ? "掲載開始と商談" : "Go Live and Start Talks"}</p>
+                <p className="mt-2 text-sm leading-7 text-slate-300">{locale === "ja" ? "条件が揃うと自動で公開され、発注企業から問い合わせを受信。" : "Once payment and profile completion are in place, the listing goes live automatically and can receive buyer inquiries."}</p>
               </article>
             </div>
             <div className="mt-8 flex flex-wrap gap-3">

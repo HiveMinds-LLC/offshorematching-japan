@@ -56,39 +56,54 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
 
-  const targetLanguage = String(body.targetLanguage ?? "").trim() as VendorPreferredLanguage;
+  const targetLanguage = (String(body.targetLanguage ?? "ja").trim() || "ja") as VendorPreferredLanguage;
   const summary = String(body.summary ?? "").trim();
-  const portfolioProjects = Array.isArray(body.portfolioProjects) ? (body.portfolioProjects as PortfolioProject[]) : [];
+  const portfolioProject = body.portfolioProject && typeof body.portfolioProject === "object"
+    ? (body.portfolioProject as PortfolioProject)
+    : null;
 
   if (!targetLanguage) {
     return NextResponse.json({ error: "targetLanguage is required." }, { status: 400 });
   }
 
-  const texts = [
-    summary,
-    ...portfolioProjects.flatMap((project) => [project.title, project.summary, project.businessImpact].map((value) => value.trim()))
-  ].filter(Boolean);
+  if (!summary && !portfolioProject) {
+    return NextResponse.json({ error: "summary or portfolioProject is required." }, { status: 400 });
+  }
 
   try {
-    const translated = await translateTexts(texts, targetLanguage);
-    let cursor = 0;
+    if (portfolioProject) {
+      const texts = [
+        portfolioProject.title.trim(),
+        portfolioProject.durationLabel.trim(),
+        portfolioProject.budgetLabel.trim(),
+        portfolioProject.summary.trim(),
+        ...portfolioProject.technologies.map((item) => item.trim()).filter(Boolean),
+        portfolioProject.businessImpact.trim()
+      ].filter(Boolean);
+      const translated = await translateTexts(texts, targetLanguage);
+      let cursor = 0;
 
-    const nextSummary = summary ? translated[cursor++] ?? summary : summary;
-    const nextPortfolioProjects = portfolioProjects.map((project) => {
-      const nextTitle = project.title.trim() ? translated[cursor++] ?? project.title : project.title;
-      const nextProjectSummary = project.summary.trim() ? translated[cursor++] ?? project.summary : project.summary;
-      const nextBusinessImpact = project.businessImpact.trim() ? translated[cursor++] ?? project.businessImpact : project.businessImpact;
-      return {
-        ...project,
-        title: nextTitle,
-        summary: nextProjectSummary,
-        businessImpact: nextBusinessImpact
-      };
-    });
+      return NextResponse.json({
+        portfolioProject: {
+          ...portfolioProject,
+          titleJa: portfolioProject.title.trim() ? translated[cursor++] ?? portfolioProject.title : portfolioProject.title,
+          durationLabelJa: portfolioProject.durationLabel.trim() ? translated[cursor++] ?? portfolioProject.durationLabel : portfolioProject.durationLabel,
+          budgetLabelJa: portfolioProject.budgetLabel.trim() ? translated[cursor++] ?? portfolioProject.budgetLabel : portfolioProject.budgetLabel,
+          summaryJa: portfolioProject.summary.trim() ? translated[cursor++] ?? portfolioProject.summary : portfolioProject.summary,
+          technologiesJa: portfolioProject.technologies.map((item) => {
+            const trimmed = item.trim();
+            return trimmed ? translated[cursor++] ?? trimmed : trimmed;
+          }).filter(Boolean),
+          businessImpactJa: portfolioProject.businessImpact.trim() ? translated[cursor++] ?? portfolioProject.businessImpact : portfolioProject.businessImpact
+        }
+      });
+    }
+
+    const translated = await translateTexts([summary], targetLanguage);
+    const nextSummary = translated[0] ?? summary;
 
     return NextResponse.json({
-      summary: nextSummary,
-      portfolioProjects: nextPortfolioProjects
+      summary: nextSummary
     });
   } catch (error) {
     return NextResponse.json(

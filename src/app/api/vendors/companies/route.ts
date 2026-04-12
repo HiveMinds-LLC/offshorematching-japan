@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
 
-import { listCompaniesForMarketplace } from "@/lib/server/api-store";
+import { getMarketplaceStats, listCompaniesForMarketplace } from "@/lib/server/api-store";
 
 export async function GET() {
-  const companies = await listCompaniesForMarketplace();
-  return NextResponse.json({ companies });
+  const [companies, stats] = await Promise.all([listCompaniesForMarketplace(), getMarketplaceStats()]);
+  return NextResponse.json(
+    { companies, stats },
+    {
+      headers: {
+        "Cache-Control": "no-store"
+      }
+    }
+  );
 }

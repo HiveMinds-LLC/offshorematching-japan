@@ -6,20 +6,29 @@ import { useLocale } from "@/components/i18n/locale-provider";
 
 type AppTopbarProps = {
   title: string;
+  titleEn?: string;
   subtitle?: string;
+  subtitleEn?: string;
+  stats?: Array<{
+    label: string;
+    labelEn?: string;
+    value: number;
+  }>;
 };
 
-export function AppTopbar({ title, subtitle }: AppTopbarProps) {
+export function AppTopbar({ title, titleEn, subtitle, subtitleEn }: AppTopbarProps) {
   const { locale } = useLocale();
+  const resolvedTitle = locale === "ja" ? title : (titleEn ?? title);
+  const resolvedSubtitle = locale === "ja" ? subtitle : (subtitleEn ?? subtitle);
   return (
     <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur">
       <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <Link href="/" className="font-[family-name:var(--font-display)] text-lg font-extrabold text-slate-900">
-            OffshoreMatch
+            offshoredevelopment.com
           </Link>
           <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-600 sm:text-[11px]">
-            {title}
+            {resolvedTitle}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -29,6 +38,11 @@ export function AppTopbar({ title, subtitle }: AppTopbarProps) {
           </Link>
         </div>
       </div>
+      {resolvedSubtitle ? (
+        <div className="mx-auto w-full max-w-7xl px-4 pb-3">
+          <p className="text-xs text-slate-500">{resolvedSubtitle}</p>
+        </div>
+      ) : null}
     </header>
   );
 }

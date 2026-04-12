@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 
-import { listThreadsForVendor } from "@/lib/server/api-store";
+import { listThreadsForVendorByUserId } from "@/lib/server/api-store";
+import { getCurrentVendorSession } from "@/lib/server/vendor-auth";
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const vendorCompanyId = String(searchParams.get("vendorCompanyId") ?? "").trim();
-  if (!vendorCompanyId) {
-    return NextResponse.json({ error: "vendorCompanyId is required." }, { status: 400 });
-  }
+export async function GET() {
+  const vendor = await getCurrentVendorSession();
+  if (!vendor) return NextResponse.json({ error: "開発会社ログインが必要です。" }, { status: 401 });
 
-  const threads = await listThreadsForVendor(vendorCompanyId);
+  const threads = await listThreadsForVendorByUserId(vendor.id);
   return NextResponse.json({ threads });
 }

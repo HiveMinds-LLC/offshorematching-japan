@@ -8,6 +8,7 @@ import { AppTopbar } from "@/components/app/app-topbar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toaster";
 
 type BuyerSignupForm = {
   companyName: string;
@@ -25,15 +26,23 @@ const defaults: BuyerSignupForm = {
   password: ""
 };
 
+function isValidBuyerPassword(password: string) {
+  return password.length >= 8 && /\d/.test(password);
+}
+
 export default function BuyerRegisterPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [form, setForm] = useState<BuyerSignupForm>(defaults);
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit() {
-    if (!form.companyName || !form.email || form.password.length < 6) {
-      setMessage("会社名・メール・6文字以上のパスワードを入力してください。");
+    if (!form.companyName || !form.email || !isValidBuyerPassword(form.password)) {
+      toast({
+        tone: "error",
+        title: "登録内容を確認してください",
+        description: "会社名・メール・8文字以上かつ数字を1つ以上含むパスワードを入力してください。"
+      });
       return;
     }
     setLoading(true);
@@ -42,13 +51,23 @@ export default function BuyerRegisterPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form)
     });
-    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    const payload = (await response.json().catch(() => ({}))) as { error?: string; requiresEmailConfirmation?: boolean };
     setLoading(false);
     if (!response.ok) {
-      setMessage(payload.error ?? "登録に失敗しました。");
+      toast({
+        tone: "error",
+        title: "登録に失敗しました",
+        description: payload.error ?? "入力内容をご確認ください。"
+      });
       return;
     }
-    setMessage("登録が完了しました。ログイン画面へ移動します。");
+    toast({
+      tone: "success",
+      title: "登録が完了しました",
+      description: payload.requiresEmailConfirmation
+        ? "確認メールの案内に従って認証した後、ログインしてください。"
+        : "ログイン画面へ移動します。"
+    });
     setForm(defaults);
     setTimeout(() => router.push("/app"), 800);
   }
@@ -62,7 +81,7 @@ export default function BuyerRegisterPage() {
             <Button variant="ghost" onClick={() => router.back()}>前の画面へ戻る</Button>
           </div>
           <h1 className="section-title">発注企業 新規登録</h1>
-          <p className="section-subtitle">登録後、/app のログインタブからサインインしてください。</p>
+          <p className="section-subtitle">登録後、このメールアドレスとパスワードで /app からログインします。</p>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1.5">
@@ -85,6 +104,7 @@ export default function BuyerRegisterPage() {
           <label className="grid gap-1.5 sm:max-w-sm">
             <span className="field-label">パスワード</span>
             <Input type="password" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
+            <span className="text-xs leading-6 text-slate-500">8文字以上で、数字を1つ以上含めてください。ログイン時にもこのパスワードを使用します。</span>
           </label>
 
           <div className="flex flex-wrap gap-2">
@@ -93,8 +113,6 @@ export default function BuyerRegisterPage() {
               ログインへ戻る
             </Link>
           </div>
-
-          {message ? <p className="text-sm text-slate-700">{message}</p> : null}
         </Card>
       </main>
     </div>

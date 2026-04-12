@@ -36,7 +36,7 @@ export default function TermsPage() {
       </Section>
 
       <Section title="4. 開発会社掲載と料金">
-        <p>開発会社による掲載申請は、当社審査および所定の月額料金の支払完了を条件として有効化されます。</p>
+        <p>開発会社による掲載は、所定の月額料金の支払完了と必須プロフィール項目の入力完了を条件として有効化されます。</p>
         <p>標準掲載料金は月額5,000円（税込表示の要否は実運用に応じて確定）です。詳細な販売条件は <Link href="/legal/commercial-transactions" className="font-semibold text-blue-700 underline underline-offset-2">特定商取引法に基づく表記</Link> に定めます。</p>
       </Section>
 
@@ -52,7 +52,7 @@ export default function TermsPage() {
 
       <Section title="7. 知的財産">
         <p>本サービス自体に関する著作権、商標権その他の権利は、当社または正当な権利者に帰属します。</p>
-        <p>利用者が本サービスへ投稿した情報について、当社はサービス運営、審査、表示、検索最適化、問い合わせ対応のために必要な範囲で利用できるものとします。</p>
+        <p>利用者が本サービスへ投稿した情報について、当社はサービス運営、表示、検索最適化、問い合わせ対応、モデレーションのために必要な範囲で利用できるものとします。</p>
       </Section>
 
       <Section title="8. 免責">

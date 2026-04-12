@@ -195,7 +195,11 @@ export const mockDb = {
     return target;
   },
   findOrCreateThread(buyerEmail: string, vendorCompanyId: string) {
-    let thread = state.threads.find((t) => t.buyerEmail === buyerEmail && t.vendorCompanyId === vendorCompanyId);
+    let thread = state.threads.find((t) => {
+      if (t.buyerEmail !== buyerEmail || t.vendorCompanyId !== vendorCompanyId) return false;
+      const deal = state.deals.get(t.id);
+      return !deal || deal.status !== "完了" || !deal.lockedAt;
+    });
     if (!thread) {
       thread = { id: id("thread"), buyerEmail, vendorCompanyId, createdAt: new Date().toISOString() };
       state.threads.unshift(thread);
@@ -227,13 +231,25 @@ export const mockDb = {
       title: patch.title ?? current?.title,
       status: patch.status,
       updatedAt: new Date().toISOString(),
-      updatedBy: patch.updatedBy
+      updatedBy: patch.updatedBy,
+      proposedStatus: null,
+      proposedBy: null,
+      proposalCreatedAt: null,
+      lockedAt: patch.status === "完了" ? new Date().toISOString() : null
     };
     state.deals.set(threadId, next);
     return next;
   },
   listMessages(threadId: string) {
     return state.messages.filter((m) => m.threadId === threadId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  },
+  deleteThread(threadId: string) {
+    const index = state.threads.findIndex((thread) => thread.id === threadId);
+    if (index < 0) return false;
+    state.threads.splice(index, 1);
+    state.messages = state.messages.filter((message) => message.threadId !== threadId);
+    state.deals.delete(threadId);
+    return true;
   },
   addMessage(threadId: string, sender: "buyer" | "vendor", body: string) {
     const thread = state.threads.find((entry) => entry.id === threadId);
@@ -246,6 +262,7 @@ export const mockDb = {
       id: id("msg"),
       threadId,
       sender,
+      messageType: "text",
       body,
       originalLanguage,
       translations: translationEnabled

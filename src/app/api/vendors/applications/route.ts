@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import type { Company, VendorApplication } from "@/lib/domain/types";
 import { TERMS_VERSION } from "@/lib/legal";
+import { getCurrentAdminSession } from "@/lib/server/admin-auth";
 import { createVendorApplication, listVendorApplications } from "@/lib/server/api-store";
 
 function makeId(prefix: string) {
@@ -9,6 +10,8 @@ function makeId(prefix: string) {
 }
 
 export async function GET() {
+  const admin = await getCurrentAdminSession();
+  if (!admin) return NextResponse.json({ error: "管理者ログインが必要です。" }, { status: 401 });
   const applications = await listVendorApplications();
   return NextResponse.json({ applications });
 }

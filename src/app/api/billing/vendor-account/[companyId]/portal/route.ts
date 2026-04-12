@@ -20,8 +20,7 @@ export async function POST(request: Request, { params }: Params) {
     try {
       const portalSession = await createStripeBillingPortalSession({
         customerId: billingAccount.stripeCustomerId,
-        origin: safeOrigin(request),
-        companyId
+        origin: safeOrigin(request)
       });
       if (portalSession?.url) {
         return NextResponse.json({ url: portalSession.url, provider: "stripe" });

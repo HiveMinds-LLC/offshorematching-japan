@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 
-import { addMessageToThread, getThreadById, listMessagesByThread } from "@/lib/server/api-store";
+import { addMessageToThread, getVendorOwnedThreadByUserId, listMessagesByThread } from "@/lib/server/api-store";
+import { getCurrentVendorSession } from "@/lib/server/vendor-auth";
 
 type Params = { params: Promise<{ threadId: string }> };
 
-export async function GET(request: Request, { params }: Params) {
-  const { threadId } = await params;
-  const { searchParams } = new URL(request.url);
-  const vendorCompanyId = String(searchParams.get("vendorCompanyId") ?? "").trim();
-  if (!vendorCompanyId) return NextResponse.json({ error: "vendorCompanyId is required." }, { status: 400 });
+export async function GET(_request: Request, { params }: Params) {
+  const vendor = await getCurrentVendorSession();
+  if (!vendor) return NextResponse.json({ error: "開発会社ログインが必要です。" }, { status: 401 });
 
-  const thread = getThreadById(threadId);
-  if (!thread || thread.vendorCompanyId !== vendorCompanyId) {
+  const { threadId } = await params;
+  const thread = await getVendorOwnedThreadByUserId(threadId, vendor.id);
+  if (!thread) {
     return NextResponse.json({ error: "Thread not found." }, { status: 404 });
   }
 
@@ -20,18 +20,20 @@ export async function GET(request: Request, { params }: Params) {
 }
 
 export async function POST(request: Request, { params }: Params) {
+  const vendor = await getCurrentVendorSession();
+  if (!vendor) return NextResponse.json({ error: "開発会社ログインが必要です。" }, { status: 401 });
+
   const body = await request.json().catch(() => null);
   const text = String(body?.body ?? "").trim();
-  const vendorCompanyId = String(body?.vendorCompanyId ?? "").trim();
   if (!text) return NextResponse.json({ error: "body is required." }, { status: 400 });
-  if (!vendorCompanyId) return NextResponse.json({ error: "vendorCompanyId is required." }, { status: 400 });
 
   const { threadId } = await params;
-  const thread = getThreadById(threadId);
-  if (!thread || thread.vendorCompanyId !== vendorCompanyId) {
+  const thread = await getVendorOwnedThreadByUserId(threadId, vendor.id);
+  if (!thread) {
     return NextResponse.json({ error: "Thread not found." }, { status: 404 });
   }
 
-  const message = await addMessageToThread(threadId, "vendor", text);
+  const message = await addMessageToThread(threadId, "vendor", text, vendor.id);
+  if (!message) return NextResponse.json({ error: "メッセージ送信に失敗しました。" }, { status: 400 });
   return NextResponse.json({ message });
 }

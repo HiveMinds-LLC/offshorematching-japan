@@ -11,6 +11,10 @@
   --font-display: "Avenir Next", "Plus Jakarta Sans", "Segoe UI", sans-serif;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   @apply bg-mist text-ink antialiased;
   font-family: var(--font-jp);
