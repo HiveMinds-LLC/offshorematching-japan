@@ -12,14 +12,11 @@ type LocaleContextValue = {
 const LocaleContext = createContext<LocaleContextValue | null>(null);
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocale] = useState<SiteLocale>("ja");
-
-  useEffect(() => {
+  const [locale, setLocale] = useState<SiteLocale>(() => {
+    if (typeof window === "undefined") return "ja";
     const stored = window.localStorage.getItem("offshorematch-locale");
-    if (stored === "ja" || stored === "en") {
-      setLocale(stored);
-    }
-  }, []);
+    return stored === "ja" || stored === "en" ? stored : "ja";
+  });
 
   useEffect(() => {
     window.localStorage.setItem("offshorematch-locale", locale);

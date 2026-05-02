@@ -17,24 +17,24 @@ export function MarketingHome() {
 
   const promises = [
     {
-      title: isJa ? "審査前提の掲載" : "Curated vendor listings",
+      title: isJa ? "比較しやすい掲載情報" : "Structured vendor listings",
       text: isJa
-        ? "開発会社のプロフィール、対応領域、価格帯、言語体制を比較しやすい粒度で整理します。"
-        : "Profiles, service scope, price bands, and language readiness are structured so buyers can compare vendors quickly.",
+        ? "プロフィール、対応領域、価格帯、言語体制を比較しやすく整理します。"
+        : "Profiles, service scope, price bands, and language readiness are structured for fast comparison.",
       icon: ShieldCheck
     },
     {
       title: isJa ? "要件整理から始められる" : "Start from requirements, not paperwork",
       text: isJa
-        ? "まだRFPがなくても、チャット形式で条件を言語化し、候補選定に進めます。"
-        : "Even without a finished RFP, buyers can turn rough requirements into a usable shortlist through chat.",
+        ? "RFPが未完成でも、チャット形式で条件を整理して候補選定へ進めます。"
+        : "Even without a finished RFP, buyers can turn rough requirements into a shortlist through chat.",
       icon: Sparkles
     },
     {
       title: isJa ? "そのまま企業間会話へ" : "Move directly into company-to-company chat",
       text: isJa
-        ? "候補保存、問い合わせ、メッセージを同じ導線に載せるため、比較後の離脱を減らせます。"
-        : "Shortlisting, inquiries, and ongoing messages stay in one flow so comparison turns into actual conversations.",
+        ? "候補保存、問い合わせ、継続メッセージを同じ導線で進められます。"
+        : "Shortlisting, inquiries, and ongoing messages stay in one flow.",
       icon: MessagesSquare
     }
   ];
@@ -44,29 +44,29 @@ export function MarketingHome() {
       step: "01",
       title: isJa ? "公開マーケットプレイスで候補を把握" : "Browse the public marketplace first",
       text: isJa
-        ? "ログイン前でも、業務システム、Web、モバイル、VR/AR、Blockchain、保守運用まで一覧できます。"
-        : "Before logging in, buyers can already browse internal systems, web, mobile, VR/AR, blockchain, and maintenance vendors."
+        ? "ログイン前でも、Web、モバイル、業務システム、VR/AR、保守運用まで一覧できます。"
+        : "Before logging in, buyers can browse web, mobile, business-system, VR/AR, and maintenance vendors."
     },
     {
       step: "02",
-      title: isJa ? "AI Matchingで条件を具体化" : "Clarify needs through AI Matching",
+      title: isJa ? "案件マッチングで条件を具体化" : "Clarify needs through project matching",
       text: isJa
-        ? "技術、人数、予算、言語要件、期間を自然文から抽出し、比較可能な条件へ変換します。"
-        : "The matching flow extracts tech, team size, budget, language, and timeline from natural language and turns them into comparable criteria."
+        ? "技術、人数、予算、言語要件、期間を自然文から抽出します。"
+        : "The matching flow extracts tech, team size, budget, language, and timeline from natural language.",
     },
     {
       step: "03",
       title: isJa ? "マッチ理由付きで候補を提示" : "Show candidates with match reasons",
       text: isJa
-        ? "単に会社名を並べるのではなく、技術一致、予算適合、人数充足などの理由を可視化します。"
-        : "Instead of a plain list, the product shows why a vendor was selected: technical fit, budget fit, and delivery capacity."
+        ? "技術一致、予算適合、体制面などの理由を見ながら比較できます。"
+        : "Compare vendors with visible reasons such as technical fit, budget fit, and delivery capacity.",
     },
     {
       step: "04",
       title: isJa ? "候補保存とメッセージで商談へ" : "Move into shortlist and direct messaging",
       text: isJa
-        ? "気になる会社を保存し、同じ画面から問い合わせと継続会話に入れます。"
-        : "Buyers can save candidates and start direct inquiries and follow-up conversations from the same workspace."
+        ? "気になる会社を保存し、そのまま問い合わせと継続会話に進めます。"
+        : "Save candidates and move directly into inquiry and follow-up chat."
     }
   ];
 
@@ -78,7 +78,7 @@ export function MarketingHome() {
         : "Use a wide marketplace view showing vendor cards, price bands, service categories, and shortlist buttons in a three-column desktop layout."
     },
     {
-      label: isJa ? "スクリーンショット 2: 発注企業のAI Matching画面" : "Screenshot 2: Buyer AI Matching view",
+      label: isJa ? "スクリーンショット 2: 発注企業の案件マッチング画面" : "Screenshot 2: Buyer project matching view",
       hint: isJa
         ? "左に相談チャット、右に抽出要件とマッチ候補が並ぶ状態。マッチ理由バッジが見えていると良い。"
         : "Show the chat on the left and extracted criteria plus matched vendors on the right, with visible match-reason badges."
@@ -95,14 +95,14 @@ export function MarketingHome() {
     {
       title: isJa ? "発注企業向け" : "For buyers",
       points: isJa
-        ? ["公開ディレクトリ閲覧", "AI要件整理", "候補保存", "企業間メッセージ", "今後: 依頼テンプレートと比較表出力"]
-        : ["Public vendor directory", "AI requirement intake", "Saved shortlist", "Company-to-company messaging", "Later: brief templates and comparison-sheet export"]
+        ? ["公開ディレクトリ閲覧", "案件マッチング", "候補保存", "企業間メッセージ", "過去案件の確認"]
+        : ["Public vendor directory", "Project matching", "Saved shortlist", "Company-to-company messaging", "Past project tracking"]
     },
     {
       title: isJa ? "開発会社向け" : "For development vendors",
       points: isJa
-        ? ["月額5,000円で掲載申請", "公開プロフィール編集", "問い合わせ受信", "請求停止・再開・解約", "今後: 実績ギャラリーと返信SLA"]
-        : ["Apply for listing from JPY 5,000 / month", "Edit the public profile", "Receive buyer inquiries", "Pause, resume, or cancel billing", "Later: portfolio gallery and response SLA"]
+        ? ["月額5,000円から掲載", "公開プロフィール編集", "問い合わせ受信", "請求停止・再開・解約", "翻訳付きチャット"]
+        : ["Listings from JPY 5,000 / month", "Edit the public profile", "Receive buyer inquiries", "Pause, resume, or cancel billing", "Translation-enabled chat"]
     }
   ];
 
@@ -116,14 +116,14 @@ export function MarketingHome() {
     {
       q: isJa ? "掲載会社はどのように管理されますか？" : "How are listed companies managed?",
       a: isJa
-        ? "掲載申請、利用規約同意、決済、審査、公開プロフィール編集、問い合わせ受信、請求管理までを一つの流れで扱います。"
-        : "Vendor onboarding covers application, legal consent, payment, review, public profile management, inquiry handling, and billing in one operating flow."
+        ? "開発会社は登録後に決済と必須プロフィール入力を完了すると自動で公開されます。公開後はプロフィール更新、問い合わせ対応、請求管理をダッシュボードで行えます。"
+        : "After signup, vendors go live automatically once billing and the required profile fields are complete. From there, the dashboard handles profile updates, buyer inquiries, and billing."
     },
     {
       q: isJa ? "将来的に何を強化する想定ですか？" : "What is planned next?",
       a: isJa
-        ? "Supabaseによる本番認証とDB、Realtime chat、翻訳API、ベクトル検索、商談管理、案件比較機能が自然な次段です。"
-        : "The natural next steps are production Supabase auth and data, realtime chat, translation APIs, vector search, deal tracking, and company comparison features."
+        ? "通知、比較表出力、返信SLAの可視化、さらにマッチング精度の改善などが自然な拡張です。"
+        : "Natural next steps include notifications, comparison-sheet export, response SLA visibility, and further matching improvements."
     }
   ];
 
@@ -184,7 +184,7 @@ export function MarketingHome() {
                 )}
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600 md:text-xl">
-                {locale === "ja" ? "OffshoreMatch は、公開ディレクトリ、要件相談、候補保存、企業間メッセージ、開発会社の掲載運用をまとめた日本市場向けマッチングSaaSです。" : "OffshoreMatch is a matching SaaS built for the Japanese market, combining a public directory, requirement consultation, shortlisting, company-to-company messaging, and vendor listing operations."}
+                {locale === "ja" ? "offshoredevelopment.com は、公開ディレクトリ、案件マッチング、企業間メッセージ、開発会社の掲載運用をまとめた日本市場向けプラットフォームです。" : "offshoredevelopment.com is a Japan-focused platform for vendor discovery, project matching, company-to-company messaging, and vendor listing operations."}
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link href="/app" className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700">
@@ -202,20 +202,20 @@ export function MarketingHome() {
                 </div>
                 <div className="rounded-2xl border border-white/70 bg-white/80 p-4">
                   <p className="text-xs font-semibold tracking-wide text-slate-500">VENDOR</p>
-                  <p className="mt-2 text-sm font-semibold text-slate-900">{locale === "ja" ? "掲載料は月額 ¥5,000" : "Listings from JPY 5,000 / month"}</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-900">{locale === "ja" ? "掲載料は月額 ¥5,000" : "Listings from JPY 5,000/month"}</p>
                 </div>
                 <div className="rounded-2xl border border-white/70 bg-white/80 p-4">
                   <p className="text-xs font-semibold tracking-wide text-slate-500">FLOW</p>
-                  <p className="mt-2 text-sm font-semibold text-slate-900">{locale === "ja" ? "比較から会話まで一画面導線" : "One flow from comparison to conversation"}</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-900">{locale === "ja" ? "比較から会話まで同じ導線" : "One flow from comparison to conversation"}</p>
                 </div>
               </div>
             </motion.div>
 
             <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}>
               <div className="relative rounded-[32px] border border-white/70 bg-white/75 p-4 shadow-[0_24px_80px_rgba(15,23,42,0.12)] backdrop-blur">
-                <div className="absolute -right-6 -top-6 hidden rounded-2xl border border-blue-200 bg-white px-4 py-3 shadow-lg md:block">
+                <div className="absolute right-4 top-4 z-20 hidden rounded-2xl border border-blue-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur md:block">
                   <p className="text-[11px] font-semibold tracking-[0.14em] text-blue-700">APP SNAPSHOT</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{locale === "ja" ? "マーケットプレイス + AI Matching + メッセージ" : "Marketplace + AI Matching + Messaging"}</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{locale === "ja" ? "マーケットプレイス + 案件マッチング + メッセージ" : "Marketplace + Project Matching + Messaging"}</p>
                 </div>
                 <ImagePlaceholder label={locale === "ja" ? "ヒーロースクリーンショット" : "Hero Screenshot"} hint={locale === "ja" ? "推奨画像: マーケットプレイス一覧と右側に相談導線が見えるトップ画面。サービス全体像が一目で伝わる構図。" : "Suggested image: a top-level marketplace screen with the consultation entry visible on the right."} />
               </div>
@@ -247,15 +247,15 @@ export function MarketingHome() {
               <h2 className="mt-3 font-[family-name:var(--font-display)] text-4xl font-bold text-slate-900 md:text-5xl">
                 {isJa ? (
                   <>
-                    オフショア開発の失敗要因を、
+                    オフショア開発のリスクを、
                     <br />
-                    最初の導線で減らす。
+                    比較段階から減らす。
                   </>
                 ) : (
                   <>
                     Reduce offshore delivery risk
                     <br />
-                    at the very first decision point.
+                    before delivery even starts.
                   </>
                 )}
               </h2>
@@ -263,18 +263,18 @@ export function MarketingHome() {
             <div className="grid gap-4 text-base leading-8 text-slate-600">
               <p>
                 {isJa
-                  ? "多くの比較サイトは、会社名と曖昧な紹介文だけで終わります。結果として、発注側は比較しづらく、掲載側も問い合わせに繋がりません。"
-                  : "Many comparison sites stop at a company name and a vague summary. Buyers struggle to compare, and vendors struggle to convert that traffic into actual inquiries."}
+                  ? "多くの比較サイトは、会社名と曖昧な紹介文だけで終わります。発注側は比較しづらく、掲載側も問い合わせに繋がりません。"
+                  : "Many comparison sites stop at a company name and a vague summary. Buyers struggle to compare, and vendors struggle to turn traffic into real inquiries."}
               </p>
               <p>
                 {isJa
-                  ? "OffshoreMatch は、技術領域、単価帯、チーム規模、言語体制、公開プロフィール、要件相談、問い合わせ導線までを一つの体験として設計しています。"
-                  : "OffshoreMatch combines technical scope, pricing bands, team size, language readiness, public profiles, requirement intake, and inquiry routing into one coherent experience."}
+                  ? "offshoredevelopment.com は、技術領域、単価帯、言語体制、公開プロフィール、案件マッチング、問い合わせ導線を一つの体験にまとめています。"
+                  : "offshoredevelopment.com combines technical scope, pricing bands, language readiness, public profiles, project matching, and inquiry routing in one experience."}
               </p>
               <p>
                 {isJa
-                  ? "つまり、ただ集客するLPではなく、商談の前工程を整流化するための実務プロダクトです。"
-                  : "This is not just a lead-generation landing page. It is an operating product for structuring the pre-sales stage before real delivery begins."}
+                  ? "ただの集客LPではなく、商談前の比較と選定を整流化するための実務プロダクトです。"
+                  : "This is not just a lead-generation page. It is a product for structuring comparison and pre-sales selection."}
               </p>
             </div>
           </div>
@@ -306,13 +306,13 @@ export function MarketingHome() {
               <div>
                 <p className="text-xs font-semibold tracking-[0.18em] text-blue-700">PRODUCT SCREENSHOTS</p>
                 <h2 className="mt-2 font-[family-name:var(--font-display)] text-4xl font-bold text-slate-900 md:text-5xl">
-                  {isJa ? "LPでも、アプリの実像を見せる。" : "Show the product, not just the promise."}
+                  {isJa ? "実際の画面イメージで導線を伝える。" : "Show the product, not just the promise."}
                 </h2>
               </div>
               <p className="max-w-xl text-sm leading-7 text-slate-600">
                 {isJa
-                  ? "実画像がまだ無ければ、下のプレースホルダーをそのまま使えます。撮るべき画面の内容もヒントとして明記しています。"
-                  : "If final screenshots are not ready yet, keep these placeholders. Each one already explains exactly what should be captured."}
+                  ? "実画面に近いデスクトップ幅のプレビューで、マーケットプレイス、案件マッチング、メッセージ/請求の流れを見せています。"
+                  : "These desktop-framed previews mirror the real marketplace, project matching, and messaging/billing flows."}
               </p>
             </div>
             <div className="mt-10 grid gap-6 lg:grid-cols-3">
@@ -450,8 +450,8 @@ export function MarketingHome() {
                 </h2>
                 <p className="mt-4 text-base leading-8 text-slate-600">
                   {isJa
-                    ? "発注企業には無料導線、開発会社には月額掲載と請求管理、双方にはメッセージと将来のRealtime/翻訳拡張余地を用意しています。"
-                    : "Buyers get a free path into vendor discovery. Development companies get subscription-based listings and billing controls. Both sides get direct messaging, with room for realtime and translation upgrades later."}
+                    ? "発注企業には無料導線、開発会社には月額掲載と請求管理、双方にはメッセージ機能を用意しています。翻訳付きプランでは多言語チャットにも対応します。"
+                    : "Buyers get a free path into vendor discovery. Development companies get subscription-based listings and billing controls. Both sides get direct messaging, and the translation plan adds multilingual chat support."}
                 </p>
                 <div className="mt-7 flex flex-wrap gap-3">
                   <Link href="/app" className="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800">

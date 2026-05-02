@@ -8,16 +8,19 @@ export async function GET() {
   if (isSupabaseConfigured()) {
     const supabase = await createSupabaseServerClient();
     const {
+      data: { session }
+    } = await supabase.auth.getSession();
+    const {
       data: { user }
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ role: "guest", buyer: null, vendor: null, admin: null });
+      return NextResponse.json({ role: "guest", buyer: null, vendor: null, admin: null, supabaseSession: null });
     }
 
     const appUser = await getAppUserRole(user.id);
     if (!appUser) {
-      return NextResponse.json({ role: "guest", buyer: null, vendor: null, admin: null });
+      return NextResponse.json({ role: "guest", buyer: null, vendor: null, admin: null, supabaseSession: null });
     }
 
     if (appUser.accountType === "admin") {
@@ -25,7 +28,13 @@ export async function GET() {
         role: "admin",
         buyer: null,
         vendor: null,
-        admin: { email: appUser.email || user.email || "" }
+        admin: { email: appUser.email || user.email || "" },
+        supabaseSession: session
+          ? {
+              accessToken: session.access_token,
+              refreshToken: session.refresh_token
+            }
+          : null
       });
     }
 
@@ -35,15 +44,32 @@ export async function GET() {
         role: vendor ? "vendor" : "guest",
         buyer: null,
         vendor,
-        admin: null
+        admin: null,
+        supabaseSession: session
+          ? {
+              accessToken: session.access_token,
+              refreshToken: session.refresh_token
+            }
+          : null
       });
     }
 
     const buyer = await getBuyerByUserId(user.id, user.email ?? undefined);
-    return NextResponse.json({ role: buyer ? "buyer" : "guest", buyer: buyer ?? null, vendor: null, admin: null });
+    return NextResponse.json({
+      role: buyer ? "buyer" : "guest",
+      buyer: buyer ?? null,
+      vendor: null,
+      admin: null,
+      supabaseSession: session
+        ? {
+            accessToken: session.access_token,
+            refreshToken: session.refresh_token
+          }
+        : null
+    });
   }
 
   const token = await getMockSessionToken();
   const buyer = getBuyerFromSessionToken(token) ?? null;
-  return NextResponse.json({ role: buyer ? "buyer" : "guest", buyer, vendor: null, admin: null });
+  return NextResponse.json({ role: buyer ? "buyer" : "guest", buyer, vendor: null, admin: null, supabaseSession: null });
 }

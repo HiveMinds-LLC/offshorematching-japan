@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 
-import { getVendorBillingAccount, syncVendorBillingAccountFromStripe } from "@/lib/server/api-store";
+import { createPendingBillingAccount, findVendorBillingAccountByStripeReferences, getVendorApplicationByUserId, getVendorBillingAccount, getVendorCompanyByUserId, syncVendorBillingAccountFromStripe } from "@/lib/server/api-store";
 import { retrieveStripeCheckoutSession } from "@/lib/server/stripe";
 import { getCurrentVendorSession } from "@/lib/server/vendor-auth";
 
@@ -46,11 +46,72 @@ export async function POST(request: Request) {
     currentPeriodEnd: subscriptionPeriodEnd
   });
 
-  if (!companyId) {
-    return NextResponse.json({ error: "請求対象の会社情報が見つかりません。" }, { status: 400 });
+  let billingAccount =
+    (companyId ? await getVendorBillingAccount(companyId) : null) ??
+    await findVendorBillingAccountByStripeReferences({
+      companyId,
+      applicationId,
+      subscriptionId,
+      customerId
+    }) ??
+    (vendor.companyId ? await getVendorBillingAccount(vendor.companyId) : null) ??
+    await findVendorBillingAccountByStripeReferences({
+      companyId: vendor.companyId ?? null,
+      applicationId: vendor.applicationId ?? null,
+      subscriptionId,
+      customerId
+    });
+
+  if (!billingAccount) {
+    const [application, company] = await Promise.all([
+      getVendorApplicationByUserId(vendor.id),
+      getVendorCompanyByUserId(vendor.id)
+    ]);
+    if (application?.id && application.company?.id && application.company?.name && application.contactEmail) {
+      const plan = session.metadata?.plan === "translation" ? "translation" : "basic";
+      const resolvedApplication = company
+        ? {
+            ...application,
+            company: {
+              ...application.company,
+              id: company.id,
+              name: company.name
+            }
+          }
+        : application;
+      await createPendingBillingAccount(
+        {
+          ...resolvedApplication,
+          company: {
+            ...resolvedApplication.company,
+            plan
+          }
+        },
+        plan
+      );
+
+      await syncVendorBillingAccountFromStripe({
+        applicationId,
+        companyId,
+        customerId,
+        subscriptionId,
+        plan,
+        subscriptionStatus: subscription?.status ?? (session.payment_status === "paid" ? "active" : "incomplete"),
+        currentPeriodEnd: subscriptionPeriodEnd
+      });
+
+      billingAccount =
+        (companyId ? await getVendorBillingAccount(companyId) : null) ??
+        await findVendorBillingAccountByStripeReferences({
+          companyId,
+          applicationId,
+          subscriptionId,
+          customerId
+        }) ??
+        (resolvedApplication.company.id ? await getVendorBillingAccount(resolvedApplication.company.id) : null);
+    }
   }
 
-  const billingAccount = await getVendorBillingAccount(companyId);
   if (!billingAccount) {
     return NextResponse.json({ error: "請求状態の反映に失敗しました。" }, { status: 500 });
   }

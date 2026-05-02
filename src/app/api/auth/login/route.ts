@@ -29,7 +29,13 @@ export async function POST(request: Request) {
     if (appUser.accountType === "admin") {
       return NextResponse.json({
         role: "admin",
-        admin: { email: appUser.email || data.user.email || email }
+        admin: { email: appUser.email || data.user.email || email },
+        supabaseSession: data.session
+          ? {
+              accessToken: data.session.access_token,
+              refreshToken: data.session.refresh_token
+            }
+          : null
       });
     }
 
@@ -41,7 +47,13 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         role: "vendor",
-        vendor
+        vendor,
+        supabaseSession: data.session
+          ? {
+              accessToken: data.session.access_token,
+              refreshToken: data.session.refresh_token
+            }
+          : null
       });
     }
 
@@ -50,7 +62,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "発注企業プロフィールが見つかりません。" }, { status: 404 });
     }
 
-    return NextResponse.json({ role: "buyer", buyer });
+    return NextResponse.json({
+      role: "buyer",
+      buyer,
+      supabaseSession: data.session
+        ? {
+            accessToken: data.session.access_token,
+            refreshToken: data.session.refresh_token
+          }
+        : null
+    });
   }
 
   const result = await loginBuyer(email, password);

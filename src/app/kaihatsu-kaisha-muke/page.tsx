@@ -57,18 +57,18 @@ export default function VendorMarketPage() {
                   <>
                     開発会社向け
                     <br />
-                    掲載プログラム
+                    掲載と商談の導線
                   </>
                 ) : (
                   <>
-                    Vendor-facing
+                    A vendor flow built for
                     <br />
-                    listing program
+                    visibility and inquiries
                   </>
                 )}
               </h1>
               <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-                {locale === "ja" ? "日本企業へ自社の強みを直接届けるための掲載枠です。プロフィール公開、相談受信、メッセージ返信までを統合して運用できます。" : "This listing program helps offshore vendors present their strengths directly to Japanese companies, from profile exposure to inquiry handling and replies."}
+                {locale === "ja" ? "日本企業へ自社の強みを直接届けるための掲載枠です。プロフィール公開、問い合わせ受信、メッセージ返信までを一つの運用にまとめられます。" : "This listing flow helps offshore vendors present their strengths directly to Japanese companies, from profile exposure to inquiry handling and replies."}
               </p>
             </div>
             <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl">
@@ -102,7 +102,7 @@ export default function VendorMarketPage() {
             </div>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/app/register/vendor" className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700">
-                {locale === "ja" ? "掲載申請をはじめる" : "Start Your Listing Application"}
+                {locale === "ja" ? "開発会社として登録" : "Register as a Vendor"}
               </Link>
               <Link href="/pricing" className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                 {locale === "ja" ? "料金を見る" : "View Pricing"}

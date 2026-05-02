@@ -23,24 +23,24 @@ export default function PricingPage() {
                   <>
                     料金はシンプル、
                     <br />
-                    運用は本格的。
+                    導入はすぐ始められる。
                   </>
                 ) : (
                   <>
                     Simple pricing,
                     <br />
-                    serious operations.
+                    ready to go live fast.
                   </>
                 )}
               </h1>
               <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
                 {locale === "ja"
-                  ? "開発会社は月額5,000円のベーシック掲載、または月額10,000円の翻訳付き掲載を選択できます。発注企業は無料で候補探索・相談・メッセージ機能を利用できます。"
-                  : "Vendors can choose a basic listing at JPY 5,000 per month or a translation-enabled listing at JPY 10,000 per month. Buyers can browse, consult, and message for free."}
+                  ? "開発会社は月額5,000円のスタンダード掲載、または月額10,000円の翻訳付き掲載を選択できます。発注企業は無料で候補探索、案件マッチング、メッセージ機能を利用できます。"
+                  : "Vendors can choose a standard listing at JPY 5,000 per month or a translation-enabled listing at JPY 10,000 per month. Buyers can browse, use project matching, and message for free."}
               </p>
             </div>
             <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl">
-              <ImagePlaceholder label={locale === "ja" ? "料金ページビジュアル" : "Pricing Visual"} hint={locale === "ja" ? "例: 料金カード + 審査フロー図" : "Example: pricing cards + approval flow diagram"} />
+              <ImagePlaceholder label={locale === "ja" ? "料金ページビジュアル" : "Pricing Visual"} hint={locale === "ja" ? "例: 料金カード + 登録から掲載開始までの導線図" : "Example: pricing cards + signup-to-listing flow"} />
             </div>
           </div>
         </section>
@@ -65,8 +65,8 @@ export default function PricingPage() {
               <p className="mt-1 text-sm font-semibold text-slate-600">{locale === "ja" ? "/ 月" : "/ month"}</p>
               <ul className="mt-6 grid gap-2 text-sm leading-7 text-slate-700">
                 <li>{locale === "ja" ? "ベーシックの全機能" : "Everything in Basic"}</li>
-                <li>{locale === "ja" ? "原文 + 翻訳付きチャット" : "Original + translated chat"}</li>
-                <li>{locale === "ja" ? "会社設定の優先言語に自動翻訳" : "Auto-translation into the company language"}</li>
+                <li>{locale === "ja" ? "チャットの原文と翻訳を併記表示" : "Chat shows both the original and the translation"}</li>
+                <li>{locale === "ja" ? "会社設定の優先言語へ自動翻訳" : "Auto-translation into the company language"}</li>
                 <li>{locale === "ja" ? "海外チームでも日本企業とやり取りしやすい" : "Easier communication with Japanese buyers"}</li>
               </ul>
             </article>
@@ -106,7 +106,7 @@ export default function PricingPage() {
             </div>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/app/register/vendor" className="rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-100">
-                {locale === "ja" ? "開発会社として申請" : "Apply as a Vendor"}
+                {locale === "ja" ? "開発会社として登録" : "Register as a Vendor"}
               </Link>
               <Link href="/app/register/buyer" className="rounded-2xl border border-white/30 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10">
                 {locale === "ja" ? "発注企業として登録" : "Register as a Buyer"}

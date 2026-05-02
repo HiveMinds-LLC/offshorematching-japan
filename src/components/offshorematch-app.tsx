@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { BriefcaseBusiness, Building2, ChevronDown, ChevronRight, FolderKanban, Languages, MessageSquareMore, Pencil, Sparkles, Star, Trash2, Users, Wallet } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import { SEED_PROJECT_HISTORY } from "@/lib/data/mockData";
 import { PROJECT_FILTER_OPTIONS, TECH_FILTER_OPTIONS } from "@/lib/domain/service-catalog";
 import type { BuyerCriteria, BuyerOrganization, Company, DealRecord, DealStatus, MatchResult, MessageRecord, PortfolioProject, ProjectHistoryRecord, VendorApplication, VendorBillingAccount, VendorPreferredLanguage } from "@/lib/domain/types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { runTierAwareMatch } from "@/lib/matching";
+import { MATCHING_PROJECT_TYPE_OPTIONS, emptyBuyerCriteria, inferBuyerCriteriaFromIntake, parseBudgetAnswer, parseDurationAnswer, parseProjectTypeAnswer, runTierAwareMatch } from "@/lib/matching";
 
 type SessionRole = "guest" | "buyer" | "vendor";
 type AppSectionKey =
@@ -42,6 +42,11 @@ type ChatMessage = {
   createdAt: string;
 };
 
+type SupabaseSessionPayload = {
+  accessToken: string;
+  refreshToken: string;
+};
+
 type BuyerThread = {
   id: string;
   buyerEmail: string;
@@ -53,6 +58,8 @@ type BuyerThread = {
   buyerContactName?: string;
   vendorCompanyName?: string;
   vendorContactName?: string;
+  unreadCount?: number;
+  notificationKind?: "new-chat" | "proposal-received" | "proposal-accepted" | null;
 };
 
 type ThreadOverview = {
@@ -65,17 +72,17 @@ type ThreadOverview = {
   proposedStatus?: DealStatus | null;
   proposedBy?: "buyer" | "vendor" | null;
   lockedAt?: string | null;
+  unreadCount?: number;
+  notificationKind?: "new-chat" | "proposal-received" | "proposal-accepted" | null;
 };
 
 const dealStatusOptions: DealStatus[] = ["相談中", "進行中", "完了"];
 
-const quickPrompts = [
-  "React + Node.js エンジニア4名、6ヶ月、時給30ドルまで",
-  "Java/Springのバックエンドチームを探しています。英語は必須です",
-  "AWS移行を3ヶ月で進めたい。DevOps経験のある会社希望"
-];
-
 const MARKETPLACE_PAGE_SIZE = 9;
+
+type MatchingStepKey = "projectGoal" | "projectTypes" | "budget" | "duration";
+type MatchingAnswers = Partial<Record<MatchingStepKey, string>>;
+const MATCHING_SESSION_STORAGE_KEY = "offshoredevelopment.matching-session.v1";
 
 const EMPTY_VENDOR_PROFILE_FORM = {
   name: "",
@@ -345,8 +352,40 @@ function threadStatusGroupStyle(status: DealStatus) {
   };
 }
 
-function isSubmitEnter(event: { key: string; shiftKey: boolean; nativeEvent?: { isComposing?: boolean } }) {
-  return event.key === "Enter" && !event.shiftKey && !event.nativeEvent?.isComposing;
+function threadNotificationLabel(kind: BuyerThread["notificationKind"], locale: "ja" | "en", viewerRole: "buyer" | "vendor") {
+  if (kind === "new-chat") {
+    return locale === "ja" ? "新規チャット" : "New Chat";
+  }
+  if (kind === "proposal-received") {
+    return locale === "ja"
+      ? "進行提案あり"
+      : (viewerRole === "buyer" ? "Vendor Proposed" : "Buyer Proposed");
+  }
+  if (kind === "proposal-accepted") {
+    return locale === "ja"
+      ? "提案承認"
+      : (viewerRole === "buyer" ? "Vendor Accepted" : "Buyer Accepted");
+  }
+  return "";
+}
+
+function threadNotificationTone(kind: BuyerThread["notificationKind"]) {
+  if (kind === "proposal-received") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (kind === "proposal-accepted") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (kind === "new-chat") return "border-blue-200 bg-blue-50 text-blue-800";
+  return "border-slate-200 bg-slate-50 text-slate-700";
+}
+
+function matchingLabel(locale: "ja" | "en") {
+  return locale === "ja" ? "案件マッチング" : "Project Matching";
+}
+
+function originalLabel(locale: "ja" | "en") {
+  return locale === "ja" ? "原文" : "Original";
+}
+
+function isSubmitEnter(event: { key: string; shiftKey: boolean; ctrlKey?: boolean; metaKey?: boolean; nativeEvent?: { isComposing?: boolean } }) {
+  return event.key === "Enter" && (Boolean(event.ctrlKey) || Boolean(event.metaKey)) && !event.nativeEvent?.isComposing;
 }
 
 function autosizeTextarea(element: HTMLTextAreaElement) {
@@ -407,7 +446,6 @@ function PortfolioProjectSummaryCard({ project }: { project: PortfolioProject })
 }
 
 function CompanyCard({ company, score, locale = "ja" }: { company: Company; score?: number; locale?: "ja" | "en" }) {
-  const projectScale = company.teamSize >= 100 ? "大規模案件" : company.teamSize >= 30 ? "中規模案件" : "小〜中規模案件";
   const primaryProjectType = company.portfolioProjects[0]?.projectType;
 
   return (
@@ -420,7 +458,7 @@ function CompanyCard({ company, score, locale = "ja" }: { company: Company; scor
           </div>
         </div>
 
-        <p className="min-h-[96px] text-sm leading-6 text-slate-700">{companySummaryForLocale(company, locale)}</p>
+        <p className="min-h-[96px] line-clamp-4 text-sm leading-6 text-slate-700">{companySummaryForLocale(company, locale)}</p>
 
         <div className="flex min-h-[64px] flex-wrap content-start gap-1.5">
           {company.services.slice(0, 4).map((service) => (
@@ -437,7 +475,7 @@ function CompanyCard({ company, score, locale = "ja" }: { company: Company; scor
           </p>
           <p className="flex items-center gap-1.5">
             <Users className="h-3.5 w-3.5 text-slate-500" />
-            {countryLabel(company.country, locale)} | {company.teamSize}{locale === "ja" ? "名" : ""} | {locale === "ja" ? projectScale : company.teamSize >= 100 ? "Large projects" : company.teamSize >= 30 ? "Mid-size projects" : "Small to mid-size"}
+            {countryLabel(company.country, locale)} | {company.teamSize}{locale === "ja" ? "名体制" : locale === "en" ? " team members" : ""}
           </p>
           <p className="flex items-center gap-1.5">
             <Languages className="h-3.5 w-3.5 text-slate-500" />
@@ -449,14 +487,22 @@ function CompanyCard({ company, score, locale = "ja" }: { company: Company; scor
           </p>
         </div>
 
-        <p className="mt-auto text-xs font-semibold text-blue-700 underline underline-offset-2">{locale === "ja" ? "会社プロフィールを見る" : "View company profile"}</p>
-        {typeof score === "number" ? <p className="text-xs font-semibold text-emerald-700">{locale === "ja" ? "マッチスコア" : "Match score"}: {score.toFixed(1)}</p> : null}
+        <div className="mt-auto grid gap-1">
+          <p className="text-xs font-semibold text-blue-700 underline underline-offset-2">{locale === "ja" ? "会社プロフィールを見る" : "View company profile"}</p>
+          {typeof score === "number" ? <p className="text-xs font-semibold text-emerald-700">{locale === "ja" ? "マッチスコア" : "Match score"}: {score.toFixed(1)}</p> : null}
+        </div>
       </Card>
     </Link>
   );
 }
 
 export function OffshoreMatchApp({
+  initialCompanies = [],
+  initialMarketplaceStats = {
+    listedVendorCount: 0,
+    activeMatchCount: 0,
+    completedJobCount: 0
+  },
   initialBuyer = null,
   initialVendorCompany = null,
   initialVendorApplication = null,
@@ -467,6 +513,12 @@ export function OffshoreMatchApp({
   initialThreadId = "",
   initialFavoriteCompanyIds = []
 }: {
+  initialCompanies?: Company[];
+  initialMarketplaceStats?: {
+    listedVendorCount: number;
+    activeMatchCount: number;
+    completedJobCount: number;
+  };
   initialBuyer?: BuyerOrganization | null;
   initialVendorCompany?: Company | null;
   initialVendorApplication?: VendorApplication | null;
@@ -497,12 +549,8 @@ export function OffshoreMatchApp({
   const searchParams = useSearchParams();
   const [activeSection, setActiveSection] = useState<AppSectionKey>(initialSection ?? "marketplace");
   const [sessionRole, setSessionRole] = useState<SessionRole>(initialRole === "buyer" ? "buyer" : initialRole === "vendor" ? "vendor" : "guest");
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [marketplaceStats, setMarketplaceStats] = useState({
-    listedVendorCount: 0,
-    activeMatchCount: 0,
-    completedJobCount: 0
-  });
+  const [companies, setCompanies] = useState<Company[]>(initialCompanies);
+  const [marketplaceStats, setMarketplaceStats] = useState(initialMarketplaceStats);
   const [vendorApplications, setVendorApplications] = useState<VendorApplication[]>([]);
   const [adminEmail, setAdminEmail] = useState<string | null>(initialAdminEmail);
 
@@ -523,6 +571,7 @@ export function OffshoreMatchApp({
   const [vendorProfileSaving, setVendorProfileSaving] = useState(false);
   const [editingPortfolioProjectId, setEditingPortfolioProjectId] = useState("");
   const [portfolioDraft, setPortfolioDraft] = useState<PortfolioProject | null>(null);
+  const [portfolioTechnologiesInput, setPortfolioTechnologiesInput] = useState("");
   const [portfolioSaving, setPortfolioSaving] = useState(false);
   const [portfolioDeletingId, setPortfolioDeletingId] = useState("");
   const [portfolioTranslationLoading, setPortfolioTranslationLoading] = useState(false);
@@ -536,14 +585,20 @@ export function OffshoreMatchApp({
   const [vendorBilling, setVendorBilling] = useState<VendorBillingAccount | null>(initialVendorBilling);
   const [vendorBillingMessage, setVendorBillingMessage] = useState("");
   const [billingActionLoading, setBillingActionLoading] = useState("");
+  const [restartPlanSelection, setRestartPlanSelection] = useState<Company["plan"]>(initialVendorBilling?.plan === "translation" || initialVendorCompany?.plan === "translation" ? "translation" : "basic");
   const [billingCancelConfirmOpen, setBillingCancelConfirmOpen] = useState(false);
   const [billingDowngradeConfirmOpen, setBillingDowngradeConfirmOpen] = useState(false);
+  const [pendingBuyerCompletionProposal, setPendingBuyerCompletionProposal] = useState(false);
+  const [pendingVendorCompletionProposal, setPendingVendorCompletionProposal] = useState(false);
+  const [pendingBuyerThreadDeletionId, setPendingBuyerThreadDeletionId] = useState("");
+  const [pendingVendorThreadDeletionId, setPendingVendorThreadDeletionId] = useState("");
 
   const { toast } = useToast();
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginMessage, setLoginMessage] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+  const [sessionHydrating, setSessionHydrating] = useState(true);
   const [adminLogoutLoading, setAdminLogoutLoading] = useState(false);
   const [buyerLogoutLoading, setBuyerLogoutLoading] = useState(false);
   const [activeBuyer, setActiveBuyer] = useState<BuyerOrganization | null>(initialBuyer);
@@ -561,6 +616,7 @@ export function OffshoreMatchApp({
   const [threadMessageInfo, setThreadMessageInfo] = useState("");
   const [threadSending, setThreadSending] = useState(false);
   const [threadDeleting, setThreadDeleting] = useState(false);
+  const [threadStartingVendorId, setThreadStartingVendorId] = useState("");
   const [collapsedBuyerThreadGroups, setCollapsedBuyerThreadGroups] = useState<Record<DealStatus, boolean>>({
     "相談中": false,
     "進行中": false,
@@ -598,16 +654,18 @@ export function OffshoreMatchApp({
 
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      id: makeId("chat"),
-      role: "assistant",
-      content: "ご希望の開発体制を自然文で入力してください。要件を整理し、最適な候補会社を提案します。",
-      createdAt: new Date().toISOString()
-    }
+    createInitialMatchingAssistantMessage(locale)
   ]);
   const [criteria, setCriteria] = useState<BuyerCriteria | null>(null);
-  const buyerMessagingVisible = activeSection === "buyer-messages";
-  const vendorMessagingVisible = activeSection === "vendor-messages";
+  const [matchingDraftCriteria, setMatchingDraftCriteria] = useState<BuyerCriteria>(emptyBuyerCriteria());
+  const [matchingAnswers, setMatchingAnswers] = useState<MatchingAnswers>({});
+  const [matchingProjectGoal, setMatchingProjectGoal] = useState("");
+  const [matchingStepIndex, setMatchingStepIndex] = useState(0);
+  const [matchingLoading, setMatchingLoading] = useState(false);
+  const [matchingSessionReady, setMatchingSessionReady] = useState(false);
+  const [browserSupabaseReady, setBrowserSupabaseReady] = useState(false);
+  const buyerMessagingVisible = activeSection === "buyer-messages" || activeSection === "buyer-overview";
+  const vendorMessagingVisible = activeSection === "vendor-messages" || activeSection === "vendor-overview";
   const billingReturnFlag = searchParams.get("billing_return");
   const activeVendorBillingCompanyId = vendorBilling?.companyId || activeVendorCompany?.id || "";
 
@@ -637,14 +695,103 @@ export function OffshoreMatchApp({
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
   }, [activeSection, activeThreadId, activeVendorThreadId, pathname, router, searchParams]);
 
-  async function readJson<T>(input: RequestInfo, init?: RequestInit): Promise<{ ok: boolean; data?: T; error?: string }> {
+  const readJson = useCallback(async function readJson<T>(input: RequestInfo, init?: RequestInit): Promise<{ ok: boolean; data?: T; error?: string }> {
     const response = await fetch(input, init);
     const payload = (await response.json().catch(() => ({}))) as T & { error?: string };
     if (!response.ok) return { ok: false, error: payload.error ?? (locale === "ja" ? "リクエストに失敗しました。" : "Request failed.") };
     return { ok: true, data: payload };
-  }
+  }, [locale]);
 
-  async function refreshCompanies() {
+  const syncSessionContext = useCallback(async function syncSessionContext() {
+    const response = await readJson<{
+      role: "guest" | "buyer" | "vendor" | "admin";
+      buyer?: BuyerOrganization | null;
+      vendor?: Company | null;
+      admin?: { email: string } | null;
+      supabaseSession?: SupabaseSessionPayload | null;
+    }>("/api/auth/session", { cache: "no-store" });
+
+    if (!response.ok || !response.data) {
+      return null;
+    }
+
+    if (response.data.role === "buyer" && response.data.buyer) {
+      setSessionRole("buyer");
+      setActiveBuyer(response.data.buyer);
+      setActiveVendorCompany(null);
+      setAdminEmail(null);
+      return response.data;
+    }
+
+    if (response.data.role === "vendor" && response.data.vendor) {
+      setSessionRole("vendor");
+      setActiveVendorCompany(response.data.vendor);
+      setActiveBuyer(null);
+      setAdminEmail(null);
+      return response.data;
+    }
+
+    if (response.data.role === "admin" && response.data.admin) {
+      setSessionRole("guest");
+      setAdminEmail(response.data.admin.email);
+      setActiveBuyer(null);
+      setActiveVendorCompany(null);
+      return response.data;
+    }
+
+    setSessionRole("guest");
+    setAdminEmail(null);
+    setActiveBuyer(null);
+    setActiveVendorCompany(null);
+    return response.data;
+  }, [readJson]);
+
+  const ensureBrowserSupabaseSession = useCallback(async function ensureBrowserSupabaseSession(sessionPayload?: SupabaseSessionPayload | null) {
+    if (!supabase) {
+      setBrowserSupabaseReady(true);
+      return false;
+    }
+
+    let nextSession = sessionPayload ?? null;
+    if (!nextSession) {
+      const sessionData = await syncSessionContext();
+      nextSession = sessionData?.supabaseSession ?? null;
+    }
+
+    if (!nextSession) {
+      await supabase.auth.signOut();
+      setBrowserSupabaseReady(true);
+      return false;
+    }
+
+    const { error } = await supabase.auth.setSession({
+      access_token: nextSession.accessToken,
+      refresh_token: nextSession.refreshToken
+    });
+    if (!error) {
+      supabase.realtime.setAuth(nextSession.accessToken);
+    }
+    setBrowserSupabaseReady(true);
+    return !error;
+  }, [supabase, syncSessionContext]);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.access_token) {
+        supabase.realtime.setAuth(session.access_token);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  const refreshCompanies = useCallback(async function refreshCompanies() {
     const response = await readJson<{
       companies: Company[];
       stats?: { listedVendorCount: number; activeMatchCount: number; completedJobCount: number };
@@ -652,18 +799,18 @@ export function OffshoreMatchApp({
     if (!response.ok || !response.data) return;
     setCompanies(response.data.companies);
     if (response.data.stats) setMarketplaceStats(response.data.stats);
-  }
+  }, [readJson]);
 
-  async function refreshSavedCompanies() {
+  const refreshSavedCompanies = useCallback(async function refreshSavedCompanies() {
     const response = await readJson<{ companyIds: string[] }>("/api/buyers/saved-companies");
     if (!response.ok || !response.data) {
       setFavoriteCompanyIds([]);
       return;
     }
     setFavoriteCompanyIds(response.data.companyIds);
-  }
+  }, [readJson]);
 
-  async function refreshThreads(preferredThreadId?: string) {
+  const refreshThreads = useCallback(async function refreshThreads(preferredThreadId?: string) {
     setThreadsLoading((prev) => prev || threads.length === 0);
     const response = await readJson<{ threads: BuyerThread[] }>("/api/messages/threads");
     const data = response.data;
@@ -684,12 +831,14 @@ export function OffshoreMatchApp({
       return data.threads[0]?.id || "";
     });
     setThreadsLoading(false);
-  }
+  }, [initialThreadId, preferredBuyerThreadId, readJson, threads.length]);
 
-  async function refreshThreadMessages(threadId: string) {
+  const refreshThreadMessages = useCallback(async function refreshThreadMessages(threadId: string, options?: { markRead?: boolean }) {
     if (!threadId) return;
     setThreadMessagesLoading((prev) => prev || !loadedBuyerThreadIdsRef.current.has(threadId));
-    const response = await readJson<{ messages: MessageRecord[] }>(`/api/messages/threads/${threadId}/messages`);
+    const response = await readJson<{ messages: MessageRecord[] }>(
+      `/api/messages/threads/${threadId}/messages${options?.markRead ? "?markRead=1" : ""}`
+    );
     if (!response.ok || !response.data) {
       setThreadMessagesLoading(false);
       return;
@@ -709,9 +858,26 @@ export function OffshoreMatchApp({
       )
     );
     setThreadMessagesLoading(false);
-  }
+    if (options?.markRead) {
+      setThreads((current) =>
+        current.map((thread) =>
+          thread.id === threadId
+            ? { ...thread, unreadCount: 0, notificationKind: null }
+            : thread
+        )
+      );
+      setBuyerThreadOverview((current) =>
+        current.map((thread) =>
+          thread.threadId === threadId
+            ? { ...thread, unreadCount: 0, notificationKind: null }
+            : thread
+        )
+      );
+      void refreshThreads(threadId);
+    }
+  }, [readJson, refreshThreads]);
 
-  async function refreshBuyerDeal(threadId: string) {
+  const refreshBuyerDeal = useCallback(async function refreshBuyerDeal(threadId: string) {
     if (!threadId) return;
     const response = await readJson<{ deal: DealRecord | null }>(`/api/messages/threads/${threadId}/deal`);
     if (!response.ok || !response.data) return;
@@ -729,9 +895,9 @@ export function OffshoreMatchApp({
           : thread
       )
     );
-  }
+  }, [readJson]);
 
-  async function refreshVendorThreads(preferredThreadId?: string) {
+  const refreshVendorThreads = useCallback(async function refreshVendorThreads(preferredThreadId?: string) {
     setVendorThreadsLoading((prev) => prev || vendorThreads.length === 0);
     const response = await readJson<{ threads: BuyerThread[] }>("/api/messages/vendor/threads");
     if (!response.ok || !response.data) {
@@ -750,29 +916,31 @@ export function OffshoreMatchApp({
       return response.data!.threads[0]?.id || "";
     });
     setVendorThreadsLoading(false);
-  }
+  }, [preferredVendorThreadId, readJson, vendorThreads.length]);
 
-  async function refreshVendorApplication() {
+  const refreshVendorApplication = useCallback(async function refreshVendorApplication() {
     const response = await readJson<{ application: VendorApplication | null; company: Company | null }>("/api/vendors/me/application");
     if (!response.ok || !response.data) return;
     setCurrentVendorApplication(response.data.application);
     if (response.data.company) {
       setActiveVendorCompany(response.data.company);
     }
-  }
+  }, [readJson]);
 
-  async function refreshVendorBilling(vendorCompanyId: string) {
+  const refreshVendorBilling = useCallback(async function refreshVendorBilling(vendorCompanyId: string) {
     const response = await readJson<{ billingAccount: VendorBillingAccount }>(`/api/billing/vendor-account/${vendorCompanyId}`, {
       cache: "no-store"
     });
     if (!response.ok || !response.data) return;
     setVendorBilling(response.data.billingAccount);
-  }
+  }, [readJson]);
 
-  async function refreshVendorThreadMessages(threadId: string, vendorCompanyId: string) {
+  const refreshVendorThreadMessages = useCallback(async function refreshVendorThreadMessages(threadId: string, vendorCompanyId: string, options?: { markRead?: boolean }) {
     if (!threadId || !vendorCompanyId) return;
     setVendorThreadMessagesLoading((prev) => prev || !loadedVendorThreadIdsRef.current.has(threadId));
-    const response = await readJson<{ messages: MessageRecord[] }>(`/api/messages/vendor/threads/${threadId}/messages`);
+    const response = await readJson<{ messages: MessageRecord[] }>(
+      `/api/messages/vendor/threads/${threadId}/messages${options?.markRead ? "?markRead=1" : ""}`
+    );
     if (!response.ok || !response.data) {
       setVendorThreadMessagesLoading(false);
       return;
@@ -792,9 +960,26 @@ export function OffshoreMatchApp({
       )
     );
     setVendorThreadMessagesLoading(false);
-  }
+    if (options?.markRead) {
+      setVendorThreads((current) =>
+        current.map((thread) =>
+          thread.id === threadId
+            ? { ...thread, unreadCount: 0, notificationKind: null }
+            : thread
+        )
+      );
+      setVendorThreadOverview((current) =>
+        current.map((thread) =>
+          thread.threadId === threadId
+            ? { ...thread, unreadCount: 0, notificationKind: null }
+            : thread
+        )
+      );
+      void refreshVendorThreads(threadId);
+    }
+  }, [readJson, refreshVendorThreads]);
 
-  async function refreshVendorDeal(threadId: string, vendorCompanyId: string) {
+  const refreshVendorDeal = useCallback(async function refreshVendorDeal(threadId: string, vendorCompanyId: string) {
     if (!threadId || !vendorCompanyId) return;
     const response = await readJson<{ deal: DealRecord | null }>(`/api/messages/vendor/threads/${threadId}/deal`);
     if (!response.ok || !response.data) return;
@@ -812,34 +997,40 @@ export function OffshoreMatchApp({
           : thread
       )
     );
-  }
+  }, [readJson]);
 
-  async function buildBuyerThreadOverview(nextThreads: BuyerThread[]) {
+  const buildBuyerThreadOverview = useCallback(async function buildBuyerThreadOverview(nextThreads: BuyerThread[]) {
     setBuyerThreadOverviewLoading(true);
     const overviews = await Promise.all(
       nextThreads.map(async (thread) => {
         const response = await readJson<{ messages: MessageRecord[] }>(`/api/messages/threads/${thread.id}/messages`);
         const messages = response.data?.messages ?? [];
         const latest = messages[messages.length - 1];
-        const deal = await getDealByThreadForBuyer(thread.id);
+        const dealResponse = await readJson<{ deal: DealRecord | null }>(`/api/messages/threads/${thread.id}/deal`);
+        const deal = dealResponse.data?.deal ?? null;
         return {
           threadId: thread.id,
-          counterpartyLabel: companies.find((company) => company.id === thread.vendorCompanyId)?.name ?? "Unknown Vendor",
+          counterpartyLabel:
+            thread.vendorCompanyName ??
+            companies.find((company) => company.id === thread.vendorCompanyId)?.name ??
+            (locale === "ja" ? "不明な開発会社" : "Unknown Vendor"),
           lastMessage: latest?.body ?? (locale === "ja" ? "まだメッセージはありません。" : "No messages yet."),
           lastMessageAt: latest?.createdAt ?? thread.createdAt,
           messageCount: messages.length,
           status: deal?.status ?? "相談中",
           proposedStatus: deal?.proposedStatus ?? null,
           proposedBy: deal?.proposedBy ?? null,
-          lockedAt: deal?.lockedAt ?? null
+          lockedAt: deal?.lockedAt ?? null,
+          unreadCount: thread.unreadCount ?? 0,
+          notificationKind: thread.notificationKind ?? null
         } satisfies ThreadOverview;
       })
     );
     setBuyerThreadOverview(overviews.sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt)));
     setBuyerThreadOverviewLoading(false);
-  }
+  }, [companies, locale, readJson]);
 
-  async function buildVendorThreadOverview(nextThreads: BuyerThread[], vendorCompanyId: string) {
+  const buildVendorThreadOverview = useCallback(async function buildVendorThreadOverview(nextThreads: BuyerThread[], vendorCompanyId: string) {
     setVendorThreadOverviewLoading(true);
     const overviews = await Promise.all(
       nextThreads.map(async (thread) => {
@@ -848,7 +1039,8 @@ export function OffshoreMatchApp({
         );
         const messages = response.data?.messages ?? [];
         const latest = messages[messages.length - 1];
-        const deal = await getDealByThreadForVendor(thread.id, vendorCompanyId);
+        const dealResponse = await readJson<{ deal: DealRecord | null }>(`/api/messages/vendor/threads/${thread.id}/deal`);
+        const deal = dealResponse.data?.deal ?? null;
         return {
           threadId: thread.id,
           counterpartyLabel: thread.buyerCompanyName ?? thread.buyerEmail,
@@ -858,21 +1050,49 @@ export function OffshoreMatchApp({
           status: deal?.status ?? "相談中",
           proposedStatus: deal?.proposedStatus ?? null,
           proposedBy: deal?.proposedBy ?? null,
-          lockedAt: deal?.lockedAt ?? null
+          lockedAt: deal?.lockedAt ?? null,
+          unreadCount: thread.unreadCount ?? 0,
+          notificationKind: thread.notificationKind ?? null
         } satisfies ThreadOverview;
       })
     );
     setVendorThreadOverview(overviews.sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt)));
     setVendorThreadOverviewLoading(false);
-  }
+  }, [locale, readJson]);
 
   useEffect(() => {
     void (async () => {
+      const sessionData = await syncSessionContext();
+      await ensureBrowserSupabaseSession(sessionData?.supabaseSession ?? null);
       await refreshCompanies();
+
+      if (sessionData?.role === "buyer" && sessionData.buyer) {
+        await refreshThreads();
+        setSessionHydrating(false);
+        return;
+      }
+
+      if (sessionData?.role === "vendor" && sessionData.vendor) {
+        if (initialVendorApplication) {
+          setCurrentVendorApplication(initialVendorApplication);
+        } else {
+          await refreshVendorApplication();
+        }
+        await refreshVendorThreads();
+        setSessionHydrating(false);
+        return;
+      }
+
+      if (sessionData?.role === "admin" && sessionData.admin) {
+        setSessionHydrating(false);
+        return;
+      }
+
       if (initialRole === "buyer" && initialBuyer) {
         setSessionRole("buyer");
         setActiveBuyer(initialBuyer);
         await refreshThreads();
+        setSessionHydrating(false);
         return;
       }
       if (initialRole === "vendor" && initialVendorCompany) {
@@ -884,16 +1104,19 @@ export function OffshoreMatchApp({
           await refreshVendorApplication();
         }
         await refreshVendorThreads();
+        setSessionHydrating(false);
         return;
       }
       if (initialRole === "admin" && initialAdminEmail) {
         setAdminEmail(initialAdminEmail);
         setSessionRole("guest");
+        setSessionHydrating(false);
         return;
       }
       setSessionRole("guest");
+      setSessionHydrating(false);
     })();
-  }, [initialBuyer, initialVendorApplication, initialVendorCompany, initialAdminEmail, initialRole]);
+  }, [ensureBrowserSupabaseSession, initialBuyer, initialVendorApplication, initialVendorCompany, initialAdminEmail, initialRole, refreshCompanies, refreshThreads, refreshVendorApplication, refreshVendorThreads, syncSessionContext]);
 
   useEffect(() => {
     if (!buyerMessagingVisible || !activeThreadId) {
@@ -903,9 +1126,9 @@ export function OffshoreMatchApp({
       setActiveBuyerDeal(null);
       return;
     }
-    void refreshThreadMessages(activeThreadId);
+    void refreshThreadMessages(activeThreadId, { markRead: true });
     void refreshBuyerDeal(activeThreadId);
-  }, [activeThreadId, buyerMessagingVisible]);
+  }, [activeThreadId, buyerMessagingVisible, refreshBuyerDeal, refreshThreadMessages]);
 
   useEffect(() => {
     if (!vendorMessagingVisible || !activeVendorThreadId || !activeVendorCompany) {
@@ -915,9 +1138,9 @@ export function OffshoreMatchApp({
       setActiveVendorDeal(null);
       return;
     }
-    void refreshVendorThreadMessages(activeVendorThreadId, activeVendorCompany.id);
+    void refreshVendorThreadMessages(activeVendorThreadId, activeVendorCompany.id, { markRead: true });
     void refreshVendorDeal(activeVendorThreadId, activeVendorCompany.id);
-  }, [activeVendorThreadId, activeVendorCompany, vendorMessagingVisible]);
+  }, [activeVendorThreadId, activeVendorCompany, vendorMessagingVisible, refreshVendorDeal, refreshVendorThreadMessages]);
 
   useEffect(() => {
     if (!activeVendorCompany) {
@@ -929,22 +1152,22 @@ export function OffshoreMatchApp({
       return;
     }
     void refreshVendorBilling(activeVendorCompany.id);
-  }, [activeVendorCompany?.id, vendorBilling?.companyId]);
+  }, [activeVendorCompany, vendorBilling?.companyId, refreshVendorBilling]);
 
   useEffect(() => {
     if (sessionRole !== "vendor" || !activeVendorCompany) return;
     if (activeSection !== "vendor-billing" && activeSection !== "vendor-overview") return;
     void refreshVendorBilling(activeVendorCompany.id);
-  }, [sessionRole, activeSection, activeVendorCompany?.id]);
+  }, [sessionRole, activeSection, activeVendorCompany, refreshVendorBilling]);
 
   useEffect(() => {
     if (sessionRole !== "buyer") {
       setBuyerThreadOverview([]);
       return;
     }
-    if (activeSection !== "buyer-overview" && activeSection !== "buyer-messages" && activeSection !== "buyer-projects") return;
+    if (activeSection !== "buyer-overview" && activeSection !== "buyer-projects") return;
     void buildBuyerThreadOverview(threads);
-  }, [threads, sessionRole, companies, activeSection]);
+  }, [threads, sessionRole, companies, activeSection, buildBuyerThreadOverview]);
 
   useEffect(() => {
     if (activeSection !== "marketplace") return;
@@ -952,26 +1175,26 @@ export function OffshoreMatchApp({
       void refreshCompanies();
     }, 10000);
     return () => window.clearInterval(interval);
-  }, [activeSection]);
+  }, [activeSection, refreshCompanies]);
 
   useEffect(() => {
     if (sessionRole !== "vendor") return;
     void refreshVendorApplication();
-  }, [sessionRole]);
+  }, [sessionRole, refreshVendorApplication]);
 
   useEffect(() => {
     if (sessionRole !== "vendor" || !activeVendorCompany) {
       setVendorThreadOverview([]);
       return;
     }
-    if (activeSection !== "vendor-overview" && activeSection !== "vendor-messages" && activeSection !== "vendor-history") return;
+    if (activeSection !== "vendor-overview" && activeSection !== "vendor-history") return;
     void buildVendorThreadOverview(vendorThreads, activeVendorCompany.id);
-  }, [vendorThreads, sessionRole, activeVendorCompany, activeSection]);
+  }, [vendorThreads, sessionRole, activeVendorCompany, activeSection, buildVendorThreadOverview]);
 
   useEffect(() => {
-    if (!supabase || sessionRole !== "buyer" || !activeBuyer || !buyerMessagingVisible) return;
+    if (!supabase || !browserSupabaseReady || sessionRole !== "buyer" || !activeBuyer) return;
     const channel = supabase
-      .channel(`buyer-chat-${activeBuyer.id}`)
+      .channel(`buyer-thread-list-${activeBuyer.id}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "message_threads", filter: `buyer_org_id=eq.${activeBuyer.id}` },
@@ -981,11 +1204,30 @@ export function OffshoreMatchApp({
       )
       .on(
         "postgres_changes",
+        { event: "*", schema: "public", table: "deal_records" },
+        () => {
+          void refreshThreads(activeThreadId || undefined);
+          if (activeThreadId) void refreshBuyerDeal(activeThreadId);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [supabase, browserSupabaseReady, sessionRole, activeBuyer, activeThreadId, refreshBuyerDeal, refreshThreads]);
+
+  useEffect(() => {
+    if (!supabase || !browserSupabaseReady || sessionRole !== "buyer" || !activeBuyer || !buyerMessagingVisible) return;
+    const channel = supabase
+      .channel(`buyer-open-thread-${activeBuyer.id}-${activeThreadId || "none"}`)
+      .on(
+        "postgres_changes",
         activeThreadId
           ? { event: "*", schema: "public", table: "messages", filter: `thread_id=eq.${activeThreadId}` }
           : { event: "*", schema: "public", table: "messages", filter: "thread_id=eq.__none__" },
         () => {
-          if (activeThreadId) void refreshThreadMessages(activeThreadId);
+          if (activeThreadId) void refreshThreadMessages(activeThreadId, { markRead: true });
         }
       )
       .on(
@@ -1002,12 +1244,12 @@ export function OffshoreMatchApp({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [supabase, sessionRole, activeBuyer, activeThreadId, buyerMessagingVisible]);
+  }, [supabase, browserSupabaseReady, sessionRole, activeBuyer, activeThreadId, buyerMessagingVisible, refreshBuyerDeal, refreshThreadMessages]);
 
   useEffect(() => {
-    if (!supabase || sessionRole !== "vendor" || !activeVendorCompany || !vendorMessagingVisible) return;
+    if (!supabase || !browserSupabaseReady || sessionRole !== "vendor" || !activeVendorCompany) return;
     const channel = supabase
-      .channel(`vendor-chat-${activeVendorCompany.id}`)
+      .channel(`vendor-thread-list-${activeVendorCompany.id}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "message_threads", filter: `vendor_profile_id=eq.${activeVendorCompany.id}` },
@@ -1017,11 +1259,30 @@ export function OffshoreMatchApp({
       )
       .on(
         "postgres_changes",
+        { event: "*", schema: "public", table: "deal_records" },
+        () => {
+          void refreshVendorThreads(activeVendorThreadId || undefined);
+          if (activeVendorThreadId) void refreshVendorDeal(activeVendorThreadId, activeVendorCompany.id);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [supabase, browserSupabaseReady, sessionRole, activeVendorCompany, activeVendorThreadId, refreshVendorDeal, refreshVendorThreads]);
+
+  useEffect(() => {
+    if (!supabase || !browserSupabaseReady || sessionRole !== "vendor" || !activeVendorCompany || !vendorMessagingVisible) return;
+    const channel = supabase
+      .channel(`vendor-open-thread-${activeVendorCompany.id}-${activeVendorThreadId || "none"}`)
+      .on(
+        "postgres_changes",
         activeVendorThreadId
           ? { event: "*", schema: "public", table: "messages", filter: `thread_id=eq.${activeVendorThreadId}` }
           : { event: "*", schema: "public", table: "messages", filter: "thread_id=eq.__none__" },
         () => {
-          if (activeVendorThreadId) void refreshVendorThreadMessages(activeVendorThreadId, activeVendorCompany.id);
+          if (activeVendorThreadId) void refreshVendorThreadMessages(activeVendorThreadId, activeVendorCompany.id, { markRead: true });
         }
       )
       .on(
@@ -1038,45 +1299,7 @@ export function OffshoreMatchApp({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [supabase, sessionRole, activeVendorCompany, activeVendorThreadId, vendorMessagingVisible]);
-
-  useEffect(() => {
-    if (sessionRole !== "buyer" || activeSection !== "buyer-messages" || !activeThreadId) return;
-
-    const refreshActiveBuyerChat = () => {
-      if (document.visibilityState !== "visible") return;
-      void refreshThreads(activeThreadId);
-      void refreshThreadMessages(activeThreadId);
-      void refreshBuyerDeal(activeThreadId);
-    };
-
-    window.addEventListener("focus", refreshActiveBuyerChat);
-    document.addEventListener("visibilitychange", refreshActiveBuyerChat);
-
-    return () => {
-      window.removeEventListener("focus", refreshActiveBuyerChat);
-      document.removeEventListener("visibilitychange", refreshActiveBuyerChat);
-    };
-  }, [sessionRole, activeSection, activeThreadId]);
-
-  useEffect(() => {
-    if (sessionRole !== "vendor" || activeSection !== "vendor-messages" || !activeVendorThreadId || !activeVendorCompany) return;
-
-    const refreshActiveVendorChat = () => {
-      if (document.visibilityState !== "visible") return;
-      void refreshVendorThreads(activeVendorThreadId);
-      void refreshVendorThreadMessages(activeVendorThreadId, activeVendorCompany.id);
-      void refreshVendorDeal(activeVendorThreadId, activeVendorCompany.id);
-    };
-
-    window.addEventListener("focus", refreshActiveVendorChat);
-    document.addEventListener("visibilitychange", refreshActiveVendorChat);
-
-    return () => {
-      window.removeEventListener("focus", refreshActiveVendorChat);
-      document.removeEventListener("visibilitychange", refreshActiveVendorChat);
-    };
-  }, [sessionRole, activeSection, activeVendorThreadId, activeVendorCompany]);
+  }, [supabase, browserSupabaseReady, sessionRole, activeVendorCompany, activeVendorThreadId, vendorMessagingVisible, refreshVendorDeal, refreshVendorThreadMessages]);
 
   useEffect(() => {
     if (sessionRole !== "vendor" || !activeVendorCompany) return;
@@ -1095,7 +1318,7 @@ export function OffshoreMatchApp({
       window.removeEventListener("focus", refreshVendorBillingState);
       document.removeEventListener("visibilitychange", refreshVendorBillingState);
     };
-  }, [sessionRole, activeSection, activeVendorCompany?.id]);
+  }, [sessionRole, activeSection, activeVendorCompany, refreshVendorApplication, refreshVendorBilling]);
 
   useEffect(() => {
     if (sessionRole !== "vendor" || !activeVendorCompany) return;
@@ -1124,18 +1347,23 @@ export function OffshoreMatchApp({
     return () => {
       cancelled = true;
     };
-  }, [billingReturnFlag, sessionRole, activeVendorCompany?.id, pathname, router, searchParams]);
+  }, [billingReturnFlag, sessionRole, activeVendorCompany, pathname, router, searchParams, refreshVendorApplication, refreshVendorBilling]);
+
 
   useEffect(() => {
+    if (sessionRole === "guest" && (activeSection.startsWith("buyer-") || activeSection.startsWith("vendor-"))) {
+      setActiveSection("auth");
+      return;
+    }
     if (activeSection !== "auth") return;
-    if (activeBuyer) {
+    if (sessionRole === "buyer" && activeBuyer) {
       setActiveSection("buyer-overview");
       return;
     }
-    if (activeVendorCompany) {
+    if (sessionRole === "vendor" && activeVendorCompany) {
       setActiveSection("vendor-overview");
     }
-  }, [activeBuyer, activeVendorCompany, activeSection]);
+  }, [activeBuyer, activeVendorCompany, activeSection, sessionRole]);
 
   useEffect(() => {
     setVendorProfileForm(buildVendorProfileForm(activeVendorCompany, currentVendorApplication));
@@ -1153,7 +1381,7 @@ export function OffshoreMatchApp({
       { key: "marketplace", label: locale === "ja" ? "マーケットプレイス" : "Marketplace" },
       { key: "buyer-overview", label: locale === "ja" ? "概要" : "Overview" },
       { key: "buyer-saved", label: locale === "ja" ? "保存候補" : "Saved" },
-      { key: "buyer-matching", label: "AI Matching" },
+      { key: "buyer-matching", label: matchingLabel(locale) },
       { key: "buyer-messages", label: locale === "ja" ? "メッセージ" : "Messages" },
       { key: "buyer-projects", label: locale === "ja" ? "過去案件" : "Projects" }
     ];
@@ -1171,6 +1399,16 @@ export function OffshoreMatchApp({
     if (adminEmail) return adminSections;
     return guestSections;
   }, [adminEmail, locale, sessionRole]);
+
+  const buyerUnreadChatCount = useMemo(
+    () => threads.filter((thread) => (thread.unreadCount ?? 0) > 0 || Boolean(thread.notificationKind)).length,
+    [threads]
+  );
+
+  const vendorUnreadChatCount = useMemo(
+    () => vendorThreads.filter((thread) => (thread.unreadCount ?? 0) > 0 || Boolean(thread.notificationKind)).length,
+    [vendorThreads]
+  );
 
   const kpis = useMemo(() => {
     const avgRate = companies.length > 0 ? Math.round(companies.reduce((acc, c) => acc + c.minRate, 0) / companies.length) : 0;
@@ -1220,6 +1458,143 @@ export function OffshoreMatchApp({
     return runTierAwareMatch(companies, criteria, {}, 6);
   }, [companies, criteria]);
 
+  const matchingSteps = useMemo(
+    () => [
+      {
+        key: "projectGoal" as MatchingStepKey,
+        prompt:
+          locale === "ja"
+            ? "まず、何を作りたいのかを教えてください。例: 在庫管理を楽にしたい、顧客向けの予約アプリを作りたい"
+            : "First, tell me what you want to build. Example: improve inventory workflows or launch a booking app for customers.",
+        quickReplies:
+          locale === "ja"
+            ? ["ECサイトを作りたい", "社内業務を効率化したい", "顧客向けアプリを作りたい", "新しいSaaSを作りたい"]
+            : ["Build an e-commerce product", "Improve internal operations", "Create a customer app", "Launch a new SaaS"]
+      },
+      {
+        key: "projectTypes" as MatchingStepKey,
+        prompt:
+          locale === "ja"
+            ? "次に、案件タイプとして近いものを選んでください。複数あればまとめて送ってください。"
+            : "Next, choose the closest project type. If more than one applies, send them together.",
+        quickReplies: [...MATCHING_PROJECT_TYPE_OPTIONS.slice(0, 5).map((option) => projectTypeLabel(option, locale)), locale === "ja" ? "未定" : "Not sure"] as string[]
+      },
+      {
+        key: "duration" as MatchingStepKey,
+        prompt:
+          locale === "ja"
+            ? "想定期間を月数で教えてください。例: 6"
+            : "How many months do you expect the project to run? Example: 6",
+        quickReplies: ["1", "3", "6", "12", locale === "ja" ? "未定" : "Not sure"]
+      },
+      {
+        key: "budget" as MatchingStepKey,
+        prompt:
+          locale === "ja"
+            ? "最後に、想定している総予算があれば教えてください。例: 3000000"
+            : "If you already have a rough total budget, enter it here. Example: 3000000",
+        quickReplies:
+          locale === "ja"
+            ? ["100万未満", "100万〜300万", "300万〜500万", "500万〜1000万", "1000万以上", "未定"]
+            : ["1000000", "3000000", "5000000", "10000000", "Not sure"]
+      }
+    ],
+    [locale]
+  );
+
+  const activeMatchingStep = matchingSteps[matchingStepIndex] ?? null;
+  const displayedCriteria = useMemo(
+    () =>
+      criteria ??
+      inferBuyerCriteriaFromIntake({
+        projectGoal: matchingProjectGoal,
+        selectedProjectTypes: matchingDraftCriteria.projectTypes,
+        deliveryPreference: "",
+        budgetCeiling: matchingDraftCriteria.budgetCeiling,
+        durationMonths: matchingDraftCriteria.durationMonths,
+        teamNeeded: null,
+        englishRequired: false,
+        japaneseRequired: false
+      }),
+    [criteria, matchingDraftCriteria, matchingProjectGoal]
+  );
+
+  const matchingSummaryItems = useMemo(
+    () => [
+      {
+        key: "projectGoal" as MatchingStepKey,
+        label: locale === "ja" ? "何を作りたいですか？" : "What do you want to build?"
+      },
+      {
+        key: "projectTypes" as MatchingStepKey,
+        label: locale === "ja" ? "近い案件タイプは？" : "Which project type is closest?"
+      },
+      {
+        key: "duration" as MatchingStepKey,
+        label: locale === "ja" ? "想定期間は？" : "What is the expected timeline?"
+      },
+      {
+        key: "budget" as MatchingStepKey,
+        label: locale === "ja" ? "総予算は？" : "What is the total budget?"
+      }
+    ]
+      .map((item) => ({
+        ...item,
+        value: matchingAnswers[item.key]?.trim() || ""
+      }))
+      .filter((item) => item.value.length > 0),
+    [locale, matchingAnswers]
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const raw = window.sessionStorage.getItem(MATCHING_SESSION_STORAGE_KEY);
+    if (!raw) {
+      setMatchingSessionReady(true);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as {
+        criteria?: BuyerCriteria | null;
+        matchingDraftCriteria?: BuyerCriteria;
+        matchingAnswers?: MatchingAnswers;
+        matchingProjectGoal?: string;
+        matchingStepIndex?: number;
+        chatMessages?: ChatMessage[];
+      };
+
+      if (parsed.criteria) setCriteria(parsed.criteria);
+      if (parsed.matchingDraftCriteria) setMatchingDraftCriteria(parsed.matchingDraftCriteria);
+      if (parsed.matchingAnswers) setMatchingAnswers(parsed.matchingAnswers);
+      if (typeof parsed.matchingProjectGoal === "string") setMatchingProjectGoal(parsed.matchingProjectGoal);
+      if (typeof parsed.matchingStepIndex === "number") setMatchingStepIndex(parsed.matchingStepIndex);
+      if (Array.isArray(parsed.chatMessages) && parsed.chatMessages.length > 0) setChatMessages(parsed.chatMessages);
+    } catch {
+      window.sessionStorage.removeItem(MATCHING_SESSION_STORAGE_KEY);
+    } finally {
+      setMatchingSessionReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!matchingSessionReady) return;
+
+    window.sessionStorage.setItem(
+      MATCHING_SESSION_STORAGE_KEY,
+      JSON.stringify({
+        criteria,
+        matchingDraftCriteria,
+        matchingAnswers,
+        matchingProjectGoal,
+        matchingStepIndex,
+        chatMessages
+      })
+    );
+  }, [chatMessages, criteria, matchingAnswers, matchingDraftCriteria, matchingProjectGoal, matchingSessionReady, matchingStepIndex]);
+
   const buyerProjects = useMemo<ProjectHistoryRecord[]>(
     () => (activeBuyer ? SEED_PROJECT_HISTORY.filter((project) => project.buyerOrgId === activeBuyer.id && project.status === "completed") : []),
     [activeBuyer]
@@ -1257,17 +1632,17 @@ export function OffshoreMatchApp({
     () =>
       dealStatusOptions.map((status) => ({
         status,
-        threads: threads.filter((thread) => (buyerThreadOverviewById.get(thread.id)?.status ?? thread.status ?? "相談中") === status)
+        threads: threads.filter((thread) => (thread.status ?? "相談中") === status)
       })),
-    [threads, buyerThreadOverviewById]
+    [threads]
   );
   const groupedVendorThreads = useMemo(
     () =>
       dealStatusOptions.map((status) => ({
         status,
-        threads: vendorThreads.filter((thread) => (vendorThreadOverviewById.get(thread.id)?.status ?? thread.status ?? "相談中") === status)
+        threads: vendorThreads.filter((thread) => (thread.status ?? "相談中") === status)
       })),
-    [vendorThreads, vendorThreadOverviewById]
+    [vendorThreads]
   );
   const buyerCompletedThreadProjects = useMemo<ProjectHistoryRecord[]>(
     () =>
@@ -1354,9 +1729,9 @@ export function OffshoreMatchApp({
     if (!activeThreadId) return;
     const thread = threads.find((entry) => entry.id === activeThreadId);
     if (!thread) return;
-    const status = buyerThreadOverviewById.get(activeThreadId)?.status ?? thread.status ?? "相談中";
+    const status = thread.status ?? "相談中";
     setCollapsedBuyerThreadGroups((current) => ({ ...current, [status]: false }));
-  }, [activeThreadId, threads, buyerThreadOverviewById]);
+  }, [activeThreadId, threads]);
 
   useEffect(() => {
     const container = vendorMessagesContainerRef.current;
@@ -1377,9 +1752,9 @@ export function OffshoreMatchApp({
     if (!activeVendorThreadId) return;
     const thread = vendorThreads.find((entry) => entry.id === activeVendorThreadId);
     if (!thread) return;
-    const status = vendorThreadOverviewById.get(activeVendorThreadId)?.status ?? thread.status ?? "相談中";
+    const status = thread.status ?? "相談中";
     setCollapsedVendorThreadGroups((current) => ({ ...current, [status]: false }));
-  }, [activeVendorThreadId, vendorThreads, vendorThreadOverviewById]);
+  }, [activeVendorThreadId, vendorThreads]);
 
   useEffect(() => {
     if (buyerThreadInputRef.current) autosizeTextarea(buyerThreadInputRef.current);
@@ -1395,6 +1770,7 @@ export function OffshoreMatchApp({
   const vendorProfileReadyForPublishing = isVendorProfileReadyForPublishing(activeVendorCompany);
   const vendorIsPublished = Boolean(activeVendorCompany?.active && vendorBillingActive);
   const effectiveVendorPlan = normalizePlan(vendorBilling?.plan ?? activeVendorCompany?.plan);
+  const logoutLoading = buyerLogoutLoading || vendorLogoutLoading || adminLogoutLoading;
   const vendorOnStandardPlan = vendorBilling?.plan === "basic" || (!vendorBilling && activeVendorCompany?.plan === "basic");
   const vendorDowngradeScheduled = vendorBilling?.pendingPlan === "basic" && Boolean(vendorBilling?.pendingPlanEffectiveAt);
   const isPortfolioEditing = Boolean(portfolioDraft);
@@ -1415,11 +1791,33 @@ export function OffshoreMatchApp({
     !vendorProfileReadyForPublishing &&
     !vendorIsPublished;
 
-  function translatedTextForViewer(message: MessageRecord, target: "ja" | "en" | "company") {
-    if (target === "ja") return message.translations.ja;
-    if (target === "en") return message.translations.en;
-    return message.translations.company;
-  }
+  useEffect(() => {
+    setRestartPlanSelection(effectiveVendorPlan);
+  }, [effectiveVendorPlan]);
+
+function translatedTextForViewer(message: MessageRecord, target: "ja" | "en" | "company") {
+  if (target === "ja") return message.translations.ja;
+  if (target === "en") return message.translations.en;
+  return message.translations.company;
+}
+
+function chatTranslationLabel(target: "ja" | "company", companyLanguage: VendorPreferredLanguage | undefined, locale: "ja" | "en") {
+  if (target === "ja") return locale === "ja" ? "日本語訳" : "Japanese Translation";
+  const language = languageLabel(companyLanguage, locale);
+  return locale === "ja" ? `${language}訳` : `${language} Translation`;
+}
+
+function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage {
+  return {
+    id: makeId("chat"),
+    role: "assistant",
+    content:
+      locale === "ja"
+        ? "案件ヒアリングを始めます。まず、何を作りたいのかを教えてください。例: 社内向けの受発注管理システム、ECアプリ、新規SaaS など"
+        : "Let's start the intake. First, tell me what you want to build. Example: an internal operations system, an e-commerce app, or a new SaaS product.",
+    createdAt: new Date().toISOString()
+  };
+}
 
   async function toggleFavoriteCompany(companyId: string) {
     if (!activeBuyer || favoriteMutationLoading) return;
@@ -1448,18 +1846,33 @@ export function OffshoreMatchApp({
     setFavoriteMutationLoading(false);
   }
 
-  async function getDealByThreadForBuyer(threadId: string) {
+  const getDealByThreadForBuyer = useCallback(async function getDealByThreadForBuyer(threadId: string) {
     const response = await readJson<{ deal: DealRecord | null }>(`/api/messages/threads/${threadId}/deal`);
     return response.data?.deal ?? null;
-  }
+  }, [readJson]);
 
-  async function getDealByThreadForVendor(threadId: string, vendorCompanyId: string) {
+  const getDealByThreadForVendor = useCallback(async function getDealByThreadForVendor(threadId: string, vendorCompanyId: string) {
     const response = await readJson<{ deal: DealRecord | null }>(`/api/messages/vendor/threads/${threadId}/deal`);
     return response.data?.deal ?? null;
-  }
+  }, [readJson]);
 
   function applyBuyerDealToOverview(threadId: string, deal: DealRecord | null) {
     if (!deal) return;
+    setThreads((current) =>
+      current.map((thread) =>
+        thread.id === threadId
+          ? {
+              ...thread,
+              status: deal.status,
+              lockedAt: deal.lockedAt ?? null,
+              notificationKind:
+                deal.proposedStatus && deal.proposedBy === "vendor"
+                  ? "proposal-received"
+                  : null
+            }
+          : thread
+      )
+    );
     setBuyerThreadOverview((current) =>
       current.map((thread) =>
         thread.threadId === threadId
@@ -1477,6 +1890,21 @@ export function OffshoreMatchApp({
 
   function applyVendorDealToOverview(threadId: string, deal: DealRecord | null) {
     if (!deal) return;
+    setVendorThreads((current) =>
+      current.map((thread) =>
+        thread.id === threadId
+          ? {
+              ...thread,
+              status: deal.status,
+              lockedAt: deal.lockedAt ?? null,
+              notificationKind:
+                deal.proposedStatus && deal.proposedBy === "buyer"
+                  ? "proposal-received"
+                  : null
+            }
+          : thread
+      )
+    );
     setVendorThreadOverview((current) =>
       current.map((thread) =>
         thread.threadId === threadId
@@ -1492,15 +1920,11 @@ export function OffshoreMatchApp({
     );
   }
 
-  async function handleBuyerDealProposal(status: DealStatus) {
+  async function handleBuyerDealProposal(status: DealStatus, options?: { skipConfirm?: boolean }) {
     if (!activeThreadId) return;
-    if (status === "完了") {
-      const confirmed = window.confirm(
-        locale === "ja"
-          ? "この案件を「完了」に提案すると、承認後は過去案件にも反映され、元に戻せません。続けますか？"
-          : "If this is confirmed as completed, it will appear in past projects and cannot be changed back. Continue?"
-      );
-      if (!confirmed) return;
+    if (status === "完了" && !options?.skipConfirm) {
+      setPendingBuyerCompletionProposal(true);
+      return;
     }
 
     const response = await readJson<{ deal: DealRecord }>(`/api/messages/threads/${activeThreadId}/deal`, {
@@ -1535,15 +1959,16 @@ export function OffshoreMatchApp({
     await buildBuyerThreadOverview(threads);
   }
 
-  async function handleVendorDealProposal(status: DealStatus) {
+  async function confirmBuyerCompletionProposal() {
+    setPendingBuyerCompletionProposal(false);
+    await handleBuyerDealProposal("完了", { skipConfirm: true });
+  }
+
+  async function handleVendorDealProposal(status: DealStatus, options?: { skipConfirm?: boolean }) {
     if (!activeVendorThreadId || !activeVendorCompany) return;
-    if (status === "完了") {
-      const confirmed = window.confirm(
-        locale === "ja"
-          ? "この案件を「完了」に提案すると、承認後は過去案件にも反映され、元に戻せません。続けますか？"
-          : "If this is confirmed as completed, it will appear in past projects and cannot be changed back. Continue?"
-      );
-      if (!confirmed) return;
+    if (status === "完了" && !options?.skipConfirm) {
+      setPendingVendorCompletionProposal(true);
+      return;
     }
 
     const response = await readJson<{ deal: DealRecord }>(`/api/messages/vendor/threads/${activeVendorThreadId}/deal`, {
@@ -1578,6 +2003,11 @@ export function OffshoreMatchApp({
     await buildVendorThreadOverview(vendorThreads, activeVendorCompany.id);
   }
 
+  async function confirmVendorCompletionProposal() {
+    setPendingVendorCompletionProposal(false);
+    await handleVendorDealProposal("完了", { skipConfirm: true });
+  }
+
   async function handleUnifiedLogin() {
     setLoginLoading(true);
     const response = await readJson<{
@@ -1585,6 +2015,7 @@ export function OffshoreMatchApp({
       buyer?: BuyerOrganization;
       vendor?: Company;
       admin?: { email: string };
+      supabaseSession?: SupabaseSessionPayload | null;
     }>("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1599,6 +2030,8 @@ export function OffshoreMatchApp({
     }
 
     setLoginMessage(locale === "ja" ? "ログインしました。" : "Signed in.");
+    setBrowserSupabaseReady(false);
+    await ensureBrowserSupabaseSession(response.data.supabaseSession ?? null);
 
     if (response.data.role === "buyer" && response.data.buyer) {
       setActiveBuyer(response.data.buyer);
@@ -1643,6 +2076,10 @@ export function OffshoreMatchApp({
   async function handleBuyerLogout() {
     setBuyerLogoutLoading(true);
     await fetch("/api/auth/logout", { method: "POST" });
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    setBrowserSupabaseReady(false);
     setSessionRole("guest");
     setActiveBuyer(null);
     setActiveVendorCompany(null);
@@ -1661,6 +2098,10 @@ export function OffshoreMatchApp({
   async function handleAdminLogout() {
     setAdminLogoutLoading(true);
     await fetch("/api/auth/logout", { method: "POST" });
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    setBrowserSupabaseReady(false);
     setAdminEmail(null);
     setActiveBuyer(null);
     setActiveVendorCompany(null);
@@ -1676,6 +2117,10 @@ export function OffshoreMatchApp({
   async function handleVendorLogout() {
     setVendorLogoutLoading(true);
     await fetch("/api/auth/logout", { method: "POST" });
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    setBrowserSupabaseReady(false);
     setActiveVendorCompany(null);
     setCurrentVendorApplication(null);
     setVendorThreads([]);
@@ -1877,6 +2322,7 @@ export function OffshoreMatchApp({
   function applyPortfolioTranslationPreview() {
     if (!portfolioTranslationPreview) return;
     setPortfolioDraft(portfolioTranslationPreview);
+    setPortfolioTechnologiesInput(portfolioTranslationPreview.technologies.join(", "));
     setPortfolioTranslationPreviewOpen(false);
     setVendorProfileMessage(
       locale === "ja"
@@ -1893,6 +2339,7 @@ export function OffshoreMatchApp({
     const nextProject = emptyPortfolioProject();
     setEditingPortfolioProjectId(nextProject.id);
     setPortfolioDraft(nextProject);
+    setPortfolioTechnologiesInput("");
   }
 
   async function removePortfolioProject(projectId: string) {
@@ -1917,11 +2364,13 @@ export function OffshoreMatchApp({
     if (!project) return;
     setEditingPortfolioProjectId(projectId);
     setPortfolioDraft({ ...project });
+    setPortfolioTechnologiesInput(project.technologies.join(", "));
   }
 
   function cancelPortfolioEditing() {
     setEditingPortfolioProjectId("");
     setPortfolioDraft(null);
+    setPortfolioTechnologiesInput("");
   }
 
   async function commitPortfolioDraft() {
@@ -1941,6 +2390,7 @@ export function OffshoreMatchApp({
     try {
       const saved = await persistVendorProfile(nextForm);
       if (!saved) return;
+      setPortfolioTechnologiesInput("");
     } finally {
       setPortfolioSaving(false);
     }
@@ -2133,7 +2583,9 @@ export function OffshoreMatchApp({
     setBillingActionLoading("checkout");
     setVendorBillingMessage("");
     const response = await readJson<{ url: string }>("/api/billing/checkout-session", {
-      method: "POST"
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plan: restartPlanSelection })
     });
     setBillingActionLoading("");
     if (!response.ok || !response.data?.url) {
@@ -2145,29 +2597,119 @@ export function OffshoreMatchApp({
 
   async function handleSendChatMessage(raw?: string) {
     const text = (raw ?? chatInput).trim();
-    if (!text || !activeBuyer) return;
+    if (!text) return;
+    if (sessionRole !== "buyer") {
+      const sessionData = await syncSessionContext();
+      if (sessionData?.role !== "buyer" || !sessionData.buyer) {
+        toast({
+          tone: "error",
+          title: locale === "ja" ? "発注企業ログインが必要です" : "Buyer login required",
+          description: locale === "ja" ? "ログイン状態を確認してから、もう一度お試しください。" : "Please confirm your buyer session and try again."
+        });
+        setActiveSection("auth");
+        return;
+      }
+    }
+
+    if (!activeMatchingStep) {
+      setChatMessages((prev) => [
+        ...prev,
+        { id: makeId("chat"), role: "assistant", content: locale === "ja" ? "このヒアリングは完了しています。新規相談を押して最初からやり直してください。" : "This intake is complete. Start a new session to begin again.", createdAt: new Date().toISOString() }
+      ]);
+      return;
+    }
 
     setChatMessages((prev) => [...prev, { id: makeId("chat"), role: "user", content: text, createdAt: new Date().toISOString() }]);
     setChatInput("");
+    let nextCriteria = matchingDraftCriteria;
+    let nextAnswers = matchingAnswers;
+    let invalidMessage = "";
 
+    switch (activeMatchingStep.key) {
+      case "projectGoal": {
+        setMatchingProjectGoal(text);
+        nextAnswers = { ...matchingAnswers, projectGoal: text };
+        break;
+      }
+      case "projectTypes": {
+        const normalized = text.trim().toLowerCase();
+        const matchedByLabel = MATCHING_PROJECT_TYPE_OPTIONS.filter((option) => projectTypeLabel(option, locale).toLowerCase() === normalized);
+        nextCriteria = { ...matchingDraftCriteria, projectTypes: matchedByLabel.length > 0 ? matchedByLabel : parseProjectTypeAnswer(text) };
+        nextAnswers = { ...matchingAnswers, projectTypes: text };
+        break;
+      }
+      case "budget": {
+        const budget = parseBudgetAnswer(text);
+        if (budget === null && !/未定|not sure|skip/i.test(text)) {
+          invalidMessage = locale === "ja" ? "総予算は数字で入力してください。例: 3000000" : "Please enter the total budget as a number. Example: 3000000";
+          break;
+        }
+        nextCriteria = { ...matchingDraftCriteria, budgetCeiling: budget };
+        nextAnswers = { ...matchingAnswers, budget: text };
+        break;
+      }
+      case "duration": {
+        const duration = parseDurationAnswer(text);
+        if (duration === null && !/未定|not sure|skip/i.test(text)) {
+          invalidMessage = locale === "ja" ? "期間は月数で入力してください。例: 6" : "Please enter the duration in months. Example: 6";
+          break;
+        }
+        nextCriteria = { ...matchingDraftCriteria, durationMonths: duration };
+        nextAnswers = { ...matchingAnswers, duration: text };
+        break;
+      }
+    }
+
+    if (invalidMessage) {
+      setChatMessages((prev) => [...prev, { id: makeId("chat"), role: "assistant", content: invalidMessage, createdAt: new Date().toISOString() }]);
+      return;
+    }
+
+    setMatchingDraftCriteria(nextCriteria);
+    setMatchingAnswers(nextAnswers);
+
+    if (matchingStepIndex < matchingSteps.length - 1) {
+      const nextStep = matchingSteps[matchingStepIndex + 1];
+      setMatchingStepIndex((current) => current + 1);
+      setChatMessages((prev) => [
+        ...prev,
+        { id: makeId("chat"), role: "assistant", content: nextStep.prompt, createdAt: new Date().toISOString() }
+      ]);
+      return;
+    }
+
+    setMatchingLoading(true);
     const response = await readJson<{ criteria: BuyerCriteria; matches: MatchResult[]; assistantMessage: string }>(
       "/api/matching/chat",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({
+          criteria: inferBuyerCriteriaFromIntake({
+            projectGoal: activeMatchingStep.key === "projectGoal" ? text : matchingProjectGoal,
+            selectedProjectTypes: nextCriteria.projectTypes,
+            deliveryPreference: "",
+            budgetCeiling: nextCriteria.budgetCeiling,
+            durationMonths: nextCriteria.durationMonths,
+            teamNeeded: null,
+            englishRequired: false,
+            japaneseRequired: false
+          })
+        })
       }
     );
+    setMatchingLoading(false);
     const data = response.data;
     if (!response.ok || !data) {
       setChatMessages((prev) => [
         ...prev,
-        { id: makeId("chat"), role: "assistant", content: response.error ?? "マッチングに失敗しました。", createdAt: new Date().toISOString() }
+        { id: makeId("chat"), role: "assistant", content: response.error ?? (locale === "ja" ? "マッチングに失敗しました。" : "Matching failed."), createdAt: new Date().toISOString() }
       ]);
       return;
     }
 
     setCriteria(data.criteria);
+    setMatchingStepIndex(matchingSteps.length);
     setChatMessages((prev) => [
       ...prev,
       { id: makeId("chat"), role: "assistant", content: data.assistantMessage, createdAt: new Date().toISOString() }
@@ -2176,63 +2718,78 @@ export function OffshoreMatchApp({
 
   function handleResetChat() {
     setCriteria(null);
+    setMatchingDraftCriteria(emptyBuyerCriteria());
+    setMatchingAnswers({});
+    setMatchingProjectGoal("");
+    setMatchingStepIndex(0);
     setChatInput("");
     setChatMessages([
-      {
-        id: makeId("chat"),
-        role: "assistant",
-        content: "新しい相談を開始しました。ご希望の開発要件を入力してください。",
-        createdAt: new Date().toISOString()
-      }
+      createInitialMatchingAssistantMessage(locale)
     ]);
   }
 
   async function handleStartThread(vendorCompanyId: string) {
-    if (!activeBuyer) return;
-    const reusableThread = threads.find((thread) => {
-      if (thread.vendorCompanyId !== vendorCompanyId) return false;
-      const overview = buyerThreadOverviewById.get(thread.id);
-      const effectiveStatus = overview?.status ?? thread.status ?? "相談中";
-      const effectiveLockedAt = overview?.lockedAt ?? thread.lockedAt ?? null;
-      return effectiveStatus !== "完了" || !effectiveLockedAt;
-    });
-
-    if (reusableThread) {
-      setActiveSection("buyer-messages");
-      setActiveThreadId(reusableThread.id);
-      setPreferredBuyerThreadId(reusableThread.id);
-      setThreadMessageInfo(locale === "ja" ? "既存のメッセージスレッドを開きました。" : "Opened the existing inquiry thread.");
-      return;
+    if (!activeBuyer) {
+      const sessionData = await syncSessionContext();
+      if (sessionData?.role !== "buyer" || !sessionData.buyer) {
+        toast({
+          tone: "error",
+          title: locale === "ja" ? "発注企業ログインが必要です" : "Buyer login required",
+          description: locale === "ja" ? "ログイン状態を確認してから、もう一度お試しください。" : "Please confirm your buyer session and try again."
+        });
+        setActiveSection("auth");
+        return;
+      }
     }
-
-    const response = await readJson<{ thread: BuyerThread }>("/api/messages/threads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ vendorCompanyId })
-    });
-    if (!response.ok || !response.data) {
-      setThreadMessageInfo(response.error ?? (locale === "ja" ? "スレッド作成に失敗しました。" : "Failed to create the thread."));
-      toast({
-        tone: "error",
-        title: locale === "ja" ? "問い合わせを開始できませんでした" : "Could not start inquiry",
-        description: response.error ?? (locale === "ja" ? "時間をおいて再度お試しください。" : "Please try again shortly.")
+    setThreadStartingVendorId(vendorCompanyId);
+    try {
+      const reusableThread = threads.find((thread) => {
+        if (thread.vendorCompanyId !== vendorCompanyId) return false;
+        const overview = buyerThreadOverviewById.get(thread.id);
+        const effectiveStatus = overview?.status ?? thread.status ?? "相談中";
+        const effectiveLockedAt = overview?.lockedAt ?? thread.lockedAt ?? null;
+        return effectiveStatus !== "完了" || !effectiveLockedAt;
       });
-      return;
+
+      if (reusableThread) {
+        setActiveSection("buyer-messages");
+        setActiveThreadId(reusableThread.id);
+        setPreferredBuyerThreadId(reusableThread.id);
+        setThreadMessageInfo(locale === "ja" ? "既存のメッセージスレッドを開きました。" : "Opened the existing inquiry thread.");
+        return;
+      }
+
+      const response = await readJson<{ thread: BuyerThread }>("/api/messages/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vendorCompanyId })
+      });
+      if (!response.ok || !response.data) {
+        setThreadMessageInfo(response.error ?? (locale === "ja" ? "スレッド作成に失敗しました。" : "Failed to create the thread."));
+        toast({
+          tone: "error",
+          title: locale === "ja" ? "問い合わせを開始できませんでした" : "Could not start inquiry",
+          description: response.error ?? (locale === "ja" ? "時間をおいて再度お試しください。" : "Please try again shortly.")
+        });
+        return;
+      }
+      setActiveSection("buyer-messages");
+      setActiveThreadId(response.data.thread.id);
+      setPreferredBuyerThreadId(response.data.thread.id);
+      setThreads((current) =>
+        current.some((thread) => thread.id === response.data!.thread.id) ? current : [response.data!.thread, ...current]
+      );
+      setThreadMessageInfo(locale === "ja" ? "メッセージスレッドを開始しました。" : "Inquiry thread started.");
+      toast({
+        tone: "success",
+        title: locale === "ja" ? "問い合わせを開始しました" : "Inquiry started"
+      });
+      await refreshThreads(response.data.thread.id);
+      await refreshThreadMessages(response.data.thread.id);
+      await refreshBuyerDeal(response.data.thread.id);
+    } finally {
+      setThreadStartingVendorId("");
     }
-    setActiveSection("buyer-messages");
-    setActiveThreadId(response.data.thread.id);
-    setPreferredBuyerThreadId(response.data.thread.id);
-    setThreads((current) =>
-      current.some((thread) => thread.id === response.data!.thread.id) ? current : [response.data!.thread, ...current]
-    );
-    setThreadMessageInfo(locale === "ja" ? "メッセージスレッドを開始しました。" : "Inquiry thread started.");
-    toast({
-      tone: "success",
-      title: locale === "ja" ? "問い合わせを開始しました" : "Inquiry started"
-    });
-    await refreshThreads(response.data.thread.id);
-    await refreshThreadMessages(response.data.thread.id);
-    await refreshBuyerDeal(response.data.thread.id);
   }
 
   async function handleSendThreadMessage() {
@@ -2276,12 +2833,11 @@ export function OffshoreMatchApp({
 
   async function handleDeleteBuyerThread(threadId = activeThreadId) {
     if (!threadId) return;
-    const confirmed = window.confirm(
-      locale === "ja"
-        ? "このチャットを削除しますか？メッセージと案件ステータスも削除されます。"
-        : "Delete this chat? Messages and project status for this thread will also be removed."
-    );
-    if (!confirmed) return;
+    setPendingBuyerThreadDeletionId(threadId);
+  }
+
+  async function confirmDeleteBuyerThread(threadId: string) {
+    if (!threadId) return;
 
     setThreadDeleting(true);
     const deletingThreadId = threadId;
@@ -2297,6 +2853,7 @@ export function OffshoreMatchApp({
       return;
     }
 
+    setPendingBuyerThreadDeletionId("");
     setThreads((prev) => prev.filter((thread) => thread.id !== deletingThreadId));
     setThreadMessages([]);
     setPendingThreadMessages([]);
@@ -2354,12 +2911,11 @@ export function OffshoreMatchApp({
 
   async function handleDeleteVendorThread(threadId = activeVendorThreadId) {
     if (!threadId) return;
-    const confirmed = window.confirm(
-      locale === "ja"
-        ? "このチャットを削除しますか？メッセージと案件ステータスも削除されます。"
-        : "Delete this chat? Messages and project status for this thread will also be removed."
-    );
-    if (!confirmed) return;
+    setPendingVendorThreadDeletionId(threadId);
+  }
+
+  async function confirmDeleteVendorThread(threadId: string) {
+    if (!threadId) return;
 
     setVendorThreadDeleting(true);
     const deletingThreadId = threadId;
@@ -2375,6 +2931,7 @@ export function OffshoreMatchApp({
       return;
     }
 
+    setPendingVendorThreadDeletionId("");
     setVendorThreads((prev) => prev.filter((thread) => thread.id !== deletingThreadId));
     setVendorThreadMessages([]);
     setPendingVendorThreadMessages([]);
@@ -2393,6 +2950,156 @@ export function OffshoreMatchApp({
 
   return (
     <div className="mx-auto w-full max-w-[1600px] px-3 pb-10 pt-6 md:px-4 xl:px-5">
+      {logoutLoading ? (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/35 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[28px] border border-white/60 bg-white p-5 shadow-2xl">
+            <p className="text-sm font-semibold text-slate-900">{locale === "ja" ? "ログアウト中..." : "Signing out..."}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              {locale === "ja" ? "セッションを安全に終了しています。完了するまで他の操作はできません。" : "Ending your session safely. Other actions are blocked until this completes."}
+            </p>
+          </div>
+        </div>
+      ) : null}
+      {pendingBuyerCompletionProposal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
+          <div className="w-full max-w-lg rounded-[28px] border border-amber-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-amber-700">{locale === "ja" ? "完了提案の確認" : "Confirm Completion Proposal"}</p>
+                <h3 className="mt-2 font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">
+                  {locale === "ja" ? "この案件を完了として提案しますか？" : "Propose this project as completed?"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="inline-flex shrink-0 whitespace-nowrap rounded-full border border-slate-200 px-3 py-1 text-sm font-semibold text-slate-500 hover:bg-slate-50"
+                onClick={() => setPendingBuyerCompletionProposal(false)}
+              >
+                {locale === "ja" ? "閉じる" : "Close"}
+              </button>
+            </div>
+            <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-4 text-sm text-slate-700">
+              <p className="font-semibold text-slate-900">
+                {locale === "ja" ? "承認されると過去案件にも反映され、このチャットは完了状態として固定されます。" : "Once accepted, this moves into past projects and the chat is locked as completed."}
+              </p>
+              <p className="mt-2 text-sm text-slate-600">
+                {locale === "ja" ? "完了後は元の進行状態へ戻せません。" : "After completion, it cannot be moved back to an active stage."}
+              </p>
+            </div>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <Button variant="ghost" onClick={() => setPendingBuyerCompletionProposal(false)}>
+                {locale === "ja" ? "やめる" : "Cancel"}
+              </Button>
+              <Button className="bg-amber-500 text-white hover:bg-amber-600" onClick={() => void confirmBuyerCompletionProposal()}>
+                {locale === "ja" ? "完了を提案する" : "Propose Completion"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {pendingVendorCompletionProposal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
+          <div className="w-full max-w-lg rounded-[28px] border border-amber-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-amber-700">{locale === "ja" ? "完了提案の確認" : "Confirm Completion Proposal"}</p>
+                <h3 className="mt-2 font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">
+                  {locale === "ja" ? "この案件を完了として提案しますか？" : "Propose this project as completed?"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="inline-flex shrink-0 whitespace-nowrap rounded-full border border-slate-200 px-3 py-1 text-sm font-semibold text-slate-500 hover:bg-slate-50"
+                onClick={() => setPendingVendorCompletionProposal(false)}
+              >
+                {locale === "ja" ? "閉じる" : "Close"}
+              </button>
+            </div>
+            <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-4 text-sm text-slate-700">
+              <p className="font-semibold text-slate-900">
+                {locale === "ja" ? "承認されると過去案件にも反映され、このチャットは完了状態として固定されます。" : "Once accepted, this moves into past projects and the chat is locked as completed."}
+              </p>
+              <p className="mt-2 text-sm text-slate-600">
+                {locale === "ja" ? "完了後は元の進行状態へ戻せません。" : "After completion, it cannot be moved back to an active stage."}
+              </p>
+            </div>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <Button variant="ghost" onClick={() => setPendingVendorCompletionProposal(false)}>
+                {locale === "ja" ? "やめる" : "Cancel"}
+              </Button>
+              <Button className="bg-amber-500 text-white hover:bg-amber-600" onClick={() => void confirmVendorCompletionProposal()}>
+                {locale === "ja" ? "完了を提案する" : "Propose Completion"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {pendingBuyerThreadDeletionId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
+          <div className="w-full max-w-lg rounded-[28px] border border-rose-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-rose-700">{locale === "ja" ? "チャット削除の確認" : "Confirm Chat Deletion"}</p>
+                <h3 className="mt-2 font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">
+                  {locale === "ja" ? "このチャットを削除しますか？" : "Delete this chat?"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="inline-flex shrink-0 whitespace-nowrap rounded-full border border-slate-200 px-3 py-1 text-sm font-semibold text-slate-500 hover:bg-slate-50"
+                onClick={() => setPendingBuyerThreadDeletionId("")}
+                disabled={threadDeleting}
+              >
+                {locale === "ja" ? "閉じる" : "Close"}
+              </button>
+            </div>
+            <div className="mt-4 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-4 text-sm text-slate-700">
+              {locale === "ja" ? "メッセージと案件ステータスもこのスレッドから削除されます。" : "Messages and project status in this thread will also be removed."}
+            </div>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <Button variant="ghost" onClick={() => setPendingBuyerThreadDeletionId("")} disabled={threadDeleting}>
+                {locale === "ja" ? "キャンセル" : "Cancel"}
+              </Button>
+              <Button className="bg-rose-600 text-white hover:bg-rose-700" onClick={() => void confirmDeleteBuyerThread(pendingBuyerThreadDeletionId)} disabled={threadDeleting}>
+                {threadDeleting ? (locale === "ja" ? "削除中..." : "Deleting...") : (locale === "ja" ? "削除する" : "Delete Chat")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {pendingVendorThreadDeletionId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
+          <div className="w-full max-w-lg rounded-[28px] border border-rose-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-rose-700">{locale === "ja" ? "チャット削除の確認" : "Confirm Chat Deletion"}</p>
+                <h3 className="mt-2 font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">
+                  {locale === "ja" ? "このチャットを削除しますか？" : "Delete this chat?"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="inline-flex shrink-0 whitespace-nowrap rounded-full border border-slate-200 px-3 py-1 text-sm font-semibold text-slate-500 hover:bg-slate-50"
+                onClick={() => setPendingVendorThreadDeletionId("")}
+                disabled={vendorThreadDeleting}
+              >
+                {locale === "ja" ? "閉じる" : "Close"}
+              </button>
+            </div>
+            <div className="mt-4 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-4 text-sm text-slate-700">
+              {locale === "ja" ? "メッセージと案件ステータスもこのスレッドから削除されます。" : "Messages and project status in this thread will also be removed."}
+            </div>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <Button variant="ghost" onClick={() => setPendingVendorThreadDeletionId("")} disabled={vendorThreadDeleting}>
+                {locale === "ja" ? "キャンセル" : "Cancel"}
+              </Button>
+              <Button className="bg-rose-600 text-white hover:bg-rose-700" onClick={() => void confirmDeleteVendorThread(pendingVendorThreadDeletionId)} disabled={vendorThreadDeleting}>
+                {vendorThreadDeleting ? (locale === "ja" ? "削除中..." : "Deleting...") : (locale === "ja" ? "削除する" : "Delete Chat")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {billingCancelConfirmOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
           <div className="w-full max-w-lg rounded-[28px] border border-rose-200 bg-white p-6 shadow-2xl">
@@ -2431,7 +3138,7 @@ export function OffshoreMatchApp({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
-                      {locale === "ja" ? "Plan Option" : "Plan Option"}
+                      {locale === "ja" ? "プラン変更" : "Plan Option"}
                     </p>
                     <p className="mt-1 font-semibold text-slate-900">
                       {locale === "ja" ? "解約よりもプラン変更はいかがですか？" : "Would a plan change work better than canceling?"}
@@ -2535,11 +3242,11 @@ export function OffshoreMatchApp({
             </div>
             <div className="mt-5 grid gap-4 lg:grid-cols-2">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Original</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{originalLabel(locale)}</p>
                 <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">{vendorProfileForm.summary}</p>
               </div>
               <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700">Japanese</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700">{locale === "ja" ? "日本語訳" : "Japanese"}</p>
                 <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-800">{profileTranslationPreview}</p>
               </div>
             </div>
@@ -2574,7 +3281,7 @@ export function OffshoreMatchApp({
             </div>
             <div className="mt-5 grid gap-4 lg:grid-cols-2">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Original</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{originalLabel(locale)}</p>
                 <div className="mt-3 grid gap-2 text-sm text-slate-700">
                   <p><span className="font-semibold text-slate-900">{locale === "ja" ? "案件名:" : "Title:"}</span> {portfolioDraft?.title || "-"}</p>
                   <p><span className="font-semibold text-slate-900">{locale === "ja" ? "期間:" : "Timeline:"}</span> {portfolioDraft?.durationLabel || "-"}</p>
@@ -2585,7 +3292,7 @@ export function OffshoreMatchApp({
                 </div>
               </div>
               <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700">Japanese</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700">{locale === "ja" ? "日本語訳" : "Japanese"}</p>
                 <div className="mt-3 grid gap-2 text-sm text-slate-800">
                   <p><span className="font-semibold text-slate-900">{locale === "ja" ? "案件名:" : "Title:"}</span> {portfolioTranslationPreview.titleJa || "-"}</p>
                   <p><span className="font-semibold text-slate-900">{locale === "ja" ? "期間:" : "Timeline:"}</span> {portfolioTranslationPreview.durationLabelJa || "-"}</p>
@@ -2611,7 +3318,7 @@ export function OffshoreMatchApp({
         <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-cyan-600 px-6 py-7 text-white">
           <p className="inline-flex rounded-full border border-white/30 bg-white/10 px-3 py-1 text-xs font-semibold">offshoredevelopment.com</p>
           <h1 className="mt-3 font-[family-name:var(--font-display)] text-3xl font-extrabold tracking-tight">{locale === "ja" ? "日本企業とオフショア開発会社を、確実に結ぶ" : "Connect Japanese companies with offshore development vendors"}</h1>
-          <p className="mt-2 max-w-3xl text-sm text-blue-100">{locale === "ja" ? "公開マーケットプレイス、開発会社登録、AIマッチング、企業間メッセージを1つに統合。" : "A single product that combines a public marketplace, vendor listings, AI matching, and company-to-company messaging."}</p>
+          <p className="mt-2 max-w-3xl text-sm text-blue-100">{locale === "ja" ? "公開マーケットプレイス、開発会社登録、案件マッチング、企業間メッセージを1つに統合。" : "A single product that combines a public marketplace, vendor listings, project matching, and company-to-company messaging."}</p>
         </div>
         <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map((kpi) => {
@@ -2710,9 +3417,21 @@ export function OffshoreMatchApp({
                   : "border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50"
               }`}
             >
-              <span className="flex items-center gap-2">
+              <span className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
                 {isPrimaryActionSection(item.key) ? <Sparkles className="h-4 w-4" /> : null}
                 <span>{item.label}</span>
+                </span>
+                {item.key === "buyer-messages" && buyerUnreadChatCount > 0 ? (
+                  <span className={`inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${activeSection === item.key ? "bg-white/20 text-white" : "bg-rose-100 text-rose-700"}`}>
+                    {buyerUnreadChatCount}
+                  </span>
+                ) : null}
+                {item.key === "vendor-messages" && vendorUnreadChatCount > 0 ? (
+                  <span className={`inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${activeSection === item.key ? "bg-white/20 text-white" : "bg-rose-100 text-rose-700"}`}>
+                    {vendorUnreadChatCount}
+                  </span>
+                ) : null}
               </span>
             </button>
           ))}
@@ -2796,24 +3515,35 @@ export function OffshoreMatchApp({
               {pagedVisibleCompanies.length > 0 ? (
                 <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
                   {pagedVisibleCompanies.map((company) => (
-                    <div key={company.id} className="grid h-full gap-2">
+                    <div key={company.id} className="grid h-full gap-3">
                       <CompanyCard company={company} locale={locale} />
                       {sessionRole !== "vendor" ? (
-                        <div className="flex gap-2">
-                          <Button variant="ghost" onClick={() => toggleFavoriteCompany(company.id)}>
-                            {favoriteCompanyIds.includes(company.id) ? (locale === "ja" ? "保存済み" : "Saved") : (locale === "ja" ? "候補に保存" : "Save")}
+                        <div className="mt-auto grid grid-cols-2 gap-2">
+                          <Button
+                            variant="ghost"
+                            className="h-11 w-full"
+                            disabled={sessionRole !== "buyer"}
+                            onClick={() => toggleFavoriteCompany(company.id)}
+                          >
+                            {sessionRole === "buyer"
+                              ? (favoriteCompanyIds.includes(company.id) ? (locale === "ja" ? "保存済み" : "Saved") : (locale === "ja" ? "候補に保存" : "Save"))
+                              : (locale === "ja" ? "ログインで保存" : "Login to Save")}
                           </Button>
                           <Button
                             variant="secondary"
+                            className="h-11 w-full"
+                            disabled={sessionRole !== "buyer" || threadStartingVendorId !== ""}
                             onClick={() => {
                               if (sessionRole === "buyer") {
                                 void handleStartThread(company.id);
-                                return;
                               }
-                              setActiveSection("auth");
                             }}
                           >
-                            {locale === "ja" ? "問い合わせへ" : "Contact"}
+                            {sessionRole !== "buyer"
+                              ? (locale === "ja" ? "ログインで相談" : "Login to Contact")
+                              : threadStartingVendorId === company.id
+                              ? (locale === "ja" ? "開始中..." : "Starting...")
+                              : (locale === "ja" ? "問い合わせへ" : "Contact")}
                           </Button>
                         </div>
                       ) : null}
@@ -2917,7 +3647,11 @@ export function OffshoreMatchApp({
           {activeSection.startsWith("buyer-") ? (
             <Card className="grid gap-4">
               <h2 className="section-title">{locale === "ja" ? "発注企業ワークスペース" : "Buyer Workspace"}</h2>
-              {sessionRole !== "buyer" || !activeBuyer ? (
+              {sessionHydrating ? (
+                <Card className="border-blue-100 bg-blue-50 p-6">
+                  <InlineLoadingState label={locale === "ja" ? "ログイン状態を確認中..." : "Checking your session..."} />
+                </Card>
+              ) : sessionRole !== "buyer" || !activeBuyer ? (
                 <Card className="border-blue-100 bg-blue-50 p-6">
                   <p className="text-sm text-slate-700">{locale === "ja" ? "この機能は発注企業ログイン後に利用できます。" : "This area is available after buyer login."}</p>
                   <div className="mt-3"><Button onClick={() => setActiveSection("auth")}>{locale === "ja" ? "ログイン / 登録へ" : "Go to Login / Register"}</Button></div>
@@ -2956,25 +3690,37 @@ export function OffshoreMatchApp({
                       </div>
                     </Card>
 
-                    <Card className="grid gap-3 border-slate-100 bg-slate-950 p-5">
-                      <div className="flex items-center gap-2 text-slate-100">
-                        <MessageSquareMore className="h-4 w-4" />
+                    <Card className="grid gap-3 border-slate-100 bg-gradient-to-br from-white via-slate-50 to-cyan-50 p-5 shadow-none">
+                      <div className="flex items-center gap-2 text-slate-900">
+                        <div className="rounded-xl bg-cyan-100 p-2 text-cyan-700">
+                          <MessageSquareMore className="h-4 w-4" />
+                        </div>
                         <p className="text-sm font-semibold">{locale === "ja" ? "最近のチャット概要" : "Recent Chats"}</p>
                       </div>
                       <div className="grid gap-2">
                         {buyerThreadOverview.slice(0, 3).map((thread) => (
-                          <div key={thread.threadId} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                          <div key={thread.threadId} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                             <div className="flex items-center justify-between gap-3">
-                              <p className="text-sm font-semibold text-white">{thread.counterpartyLabel}</p>
+                              <p className="text-sm font-semibold text-slate-900">{thread.counterpartyLabel}</p>
                               <div className="flex items-center gap-2">
-                                <span className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-200">{dealStatusLabel(thread.status, locale)}</span>
-                                <p className="text-[11px] text-slate-400">{new Date(thread.lastMessageAt).toLocaleDateString("ja-JP")}</p>
+                                {thread.notificationKind ? (
+                                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${threadNotificationTone(thread.notificationKind)}`}>
+                                    {threadNotificationLabel(thread.notificationKind, locale, "buyer")}
+                                  </span>
+                                ) : null}
+                                {(thread.unreadCount ?? 0) > 0 ? (
+                                  <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+                                    {locale === "ja" ? `未読 ${thread.unreadCount}` : `${thread.unreadCount} unread`}
+                                  </span>
+                                ) : null}
+                                <span className="rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold text-cyan-700">{dealStatusLabel(thread.status, locale)}</span>
+                                <p className="text-[11px] text-slate-500">{new Date(thread.lastMessageAt).toLocaleDateString("ja-JP")}</p>
                               </div>
                             </div>
-                            <p className="mt-2 text-xs leading-6 text-slate-300">{thread.lastMessage}</p>
+                            <p className="mt-2 text-xs leading-6 text-slate-600">{thread.lastMessage}</p>
                           </div>
                         ))}
-                        {buyerThreadOverview.length === 0 ? <p className="text-xs text-slate-400">{locale === "ja" ? "まだチャット履歴はありません。" : "No chat history yet."}</p> : null}
+                        {buyerThreadOverview.length === 0 ? <p className="text-xs text-slate-500">{locale === "ja" ? "まだチャット履歴はありません。" : "No chat history yet."}</p> : null}
                       </div>
                     </Card>
                   </div>
@@ -2986,16 +3732,16 @@ export function OffshoreMatchApp({
                       <div>
                         <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">
                           <Sparkles className="h-3.5 w-3.5" />
-                          AI Matching
+                          {matchingLabel(locale)}
                         </p>
-                        <h3 className="mt-3 font-[family-name:var(--font-display)] text-2xl font-bold">{locale === "ja" ? "まずは AI Matching で候補会社を絞り込む" : "Start with AI Matching to shortlist vendors"}</h3>
+                        <h3 className="mt-3 font-[family-name:var(--font-display)] text-2xl font-bold">{locale === "ja" ? "まずは案件マッチングで候補会社を絞り込む" : "Start with project matching to shortlist vendors"}</h3>
                         <p className="mt-2 max-w-3xl text-sm leading-7 text-cyan-50">
-                          {locale === "ja" ? "要件を自然文で入力すると、技術・単価・体制をもとに候補会社を整理します。最初にここを使うのが最短です。" : "Describe your needs in natural language and the app will organize candidates by tech, price range, and delivery setup. This is the fastest way to start."}
+                          {locale === "ja" ? "作りたい内容、案件タイプ、想定期間、総予算を順番に整理しながら候補会社を絞り込みます。最初にここを使うのが最短です。" : "Describe what you want to build, the project type, the timeline, and the budget to narrow down the strongest vendor candidates. This is the fastest way to start."}
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <Button className="bg-white text-slate-900 hover:bg-slate-100" onClick={() => setActiveSection("buyer-matching")}>
-                          {locale === "ja" ? "AI Matching を開く" : "Open AI Matching"}
+                          {locale === "ja" ? "案件マッチングを開く" : "Open Project Matching"}
                         </Button>
                         <Button variant="ghost" className="border border-white/20 bg-white/10 text-white hover:bg-white/15" onClick={() => setActiveSection("marketplace")}>
                           {locale === "ja" ? "マーケットプレイスを見る" : "View Marketplace"}
@@ -3014,14 +3760,16 @@ export function OffshoreMatchApp({
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2">
                         {favoriteCompanies.slice(0, 4).map((company) => (
-                          <div key={company.id} className="grid gap-2">
+                          <div key={company.id} className="grid h-full gap-3">
                             <CompanyCard company={company} locale={locale} />
-                            <div className="flex gap-2">
-                              <Button variant="ghost" onClick={() => toggleFavoriteCompany(company.id)}>
+                            <div className="mt-auto grid grid-cols-2 gap-2">
+                              <Button variant="ghost" className="h-11 w-full" onClick={() => toggleFavoriteCompany(company.id)}>
                                 {locale === "ja" ? "保存解除" : "Remove"}
                               </Button>
-                              <Button variant="secondary" onClick={() => handleStartThread(company.id)}>
-                                {locale === "ja" ? "問い合わせ開始" : "Start Inquiry"}
+                              <Button variant="secondary" className="h-11 w-full" disabled={threadStartingVendorId !== ""} onClick={() => void handleStartThread(company.id)}>
+                                {threadStartingVendorId === company.id
+                                  ? (locale === "ja" ? "開始中..." : "Starting...")
+                                  : (locale === "ja" ? "問い合わせ開始" : "Start Inquiry")}
                               </Button>
                             </div>
                           </div>
@@ -3061,14 +3809,16 @@ export function OffshoreMatchApp({
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                       {favoriteCompanies.slice(0, 4).map((company) => (
-                        <div key={company.id} className="grid gap-2">
+                        <div key={company.id} className="grid h-full gap-3">
                           <CompanyCard company={company} locale={locale} />
-                          <div className="flex gap-2">
-                            <Button variant="ghost" onClick={() => toggleFavoriteCompany(company.id)}>
+                          <div className="mt-auto grid grid-cols-2 gap-2">
+                            <Button variant="ghost" className="h-11 w-full" onClick={() => toggleFavoriteCompany(company.id)}>
                               {locale === "ja" ? "保存解除" : "Remove"}
                             </Button>
-                            <Button variant="secondary" onClick={() => handleStartThread(company.id)}>
-                              {locale === "ja" ? "問い合わせ開始" : "Start Inquiry"}
+                            <Button variant="secondary" className="h-11 w-full" disabled={threadStartingVendorId !== ""} onClick={() => void handleStartThread(company.id)}>
+                              {threadStartingVendorId === company.id
+                                ? (locale === "ja" ? "開始中..." : "Starting...")
+                                : (locale === "ja" ? "問い合わせ開始" : "Start Inquiry")}
                             </Button>
                           </div>
                         </div>
@@ -3109,10 +3859,10 @@ export function OffshoreMatchApp({
                   <div className="grid gap-4 xl:grid-cols-[1.1fr,1fr] xl:items-stretch">
                     <Card className="grid h-full gap-4 border-slate-100 bg-slate-50 p-5">
                       <div className="flex items-center justify-between">
-                        <h3 className="font-semibold text-slate-900">AI Matching</h3>
+                        <h3 className="font-semibold text-slate-900">{matchingLabel(locale)}</h3>
                         <Button variant="ghost" onClick={handleResetChat}>{locale === "ja" ? "新規相談" : "New Session"}</Button>
                       </div>
-                      <p className="text-sm text-slate-600">{locale === "ja" ? "要件を自然文で入力すると、候補会社と選定理由をまとめて提示します。" : "Describe your requirements in natural language to get vendor recommendations and matching reasons."}</p>
+                      <p className="text-sm text-slate-600">{locale === "ja" ? "作りたい内容、案件タイプ、想定期間、総予算を整理しながら、相性のよい会社を絞り込みます。" : "We’ll use your project type, timeline, and overall budget to narrow down the best vendor candidates."}</p>
 
                       <div className="max-h-[460px] min-h-[260px] space-y-2 overflow-auto rounded-xl border border-slate-200 bg-white p-4 md:min-h-[360px]">
                         {chatMessages.map((msg) => (
@@ -3122,8 +3872,15 @@ export function OffshoreMatchApp({
                         ))}
                       </div>
 
-                      <div className="flex flex-wrap gap-2">
-                        {quickPrompts.map((prompt) => (
+                      {activeMatchingStep ? (
+                      <div className="grid gap-2">
+                        <p className="text-xs font-semibold text-slate-500">
+                          {locale === "ja"
+                            ? `質問 ${matchingStepIndex + 1} / ${matchingSteps.length}`
+                            : `Question ${matchingStepIndex + 1} / ${matchingSteps.length}`}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                        {activeMatchingStep.quickReplies.map((prompt) => (
                           <button
                             key={prompt}
                             type="button"
@@ -3133,27 +3890,49 @@ export function OffshoreMatchApp({
                             {prompt}
                           </button>
                         ))}
+                        </div>
                       </div>
+                      ) : (
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+                          {locale === "ja" ? "ヒアリングは完了しました。必要なら新規相談でやり直せます。" : "The intake is complete. Start a new session if you want to run it again."}
+                        </div>
+                      )}
 
-                      <Field label={locale === "ja" ? "メッセージ入力" : "Requirement Input"}>
+                      <Field label={locale === "ja" ? "回答入力" : "Answer"}>
                         <Textarea
-                          rows={6}
+                          rows={4}
                           value={chatInput}
                           onChange={(e) => setChatInput(e.target.value)}
-                          placeholder={locale === "ja" ? "例: React + Node.js エンジニア4名、6ヶ月、時給5,000円まで、英語必須" : "Example: Need 4 React + Node.js engineers for 6 months, up to ¥5,000/hr, English required"}
+                          placeholder={activeMatchingStep?.prompt ?? (locale === "ja" ? "新規相談で最初から開始してください。" : "Start a new session to begin again.")}
                         />
                       </Field>
-                      <Button onClick={() => handleSendChatMessage()}><Sparkles className="h-4 w-4" />{locale === "ja" ? "送信してマッチ更新" : "Send and Refresh Matches"}</Button>
+                      <Button onClick={() => handleSendChatMessage()} disabled={matchingLoading}>
+                        <Sparkles className="h-4 w-4" />
+                        {matchingLoading ? (locale === "ja" ? "スコア計算中..." : "Scoring vendors...") : (activeMatchingStep ? (locale === "ja" ? "回答を送信" : "Send Answer") : (locale === "ja" ? "ヒアリング完了" : "Intake Complete"))}
+                      </Button>
                     </Card>
 
                     <div className="grid h-full gap-4">
-                      <Card className="border-slate-100 bg-slate-950 p-4">
-                        <h3 className="mb-2 text-sm font-semibold text-slate-200">{locale === "ja" ? "抽出要件" : "Extracted Criteria"}</h3>
-                        <pre className="overflow-auto text-xs text-slate-100">{JSON.stringify(criteria, null, 2)}</pre>
+                      <Card className="border-slate-100 bg-white p-4">
+                        <h3 className="mb-3 text-sm font-semibold text-slate-900">{locale === "ja" ? "回答済みの内容" : "Answered Questions"}</h3>
+                        {matchingSummaryItems.length > 0 ? (
+                          <div className="grid gap-3">
+                            {matchingSummaryItems.map((item) => (
+                              <div key={item.key} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{item.label}</p>
+                                <p className="mt-2 text-sm leading-6 text-slate-900">{item.value}</p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                            {locale === "ja" ? "回答すると、ここに順番に表示されます。" : "Your answers will appear here as you go."}
+                          </div>
+                        )}
                       </Card>
                       <div className="grid gap-3 sm:grid-cols-2">
                         {matchedResults.map(({ company, score, reasons }) => (
-                          <div key={company.id} className="grid h-full gap-2">
+                          <div key={company.id} className="grid h-full gap-3">
                             <CompanyCard company={company} score={score} locale={locale} />
                             <div className="flex flex-wrap gap-1.5">
                               {reasons.slice(0, 3).map((reason) => (
@@ -3162,7 +3941,11 @@ export function OffshoreMatchApp({
                                 </Badge>
                               ))}
                             </div>
-                            <Button variant="ghost" onClick={() => handleStartThread(company.id)}>{locale === "ja" ? "この会社へ問い合わせ" : "Contact This Vendor"}</Button>
+                            <Button variant="ghost" className="mt-auto h-11 w-full" disabled={threadStartingVendorId !== ""} onClick={() => void handleStartThread(company.id)}>
+                              {threadStartingVendorId === company.id
+                                ? (locale === "ja" ? "開始中..." : "Starting...")
+                                : (locale === "ja" ? "この会社へ問い合わせ" : "Contact This Vendor")}
+                            </Button>
                           </div>
                         ))}
                       </div>
@@ -3200,7 +3983,10 @@ export function OffshoreMatchApp({
                             ) : null}
                             {!collapsedBuyerThreadGroups[group.status] && group.threads.length > 0 ? (
                               group.threads.map((thread) => {
-                                const vendorName = companies.find((c) => c.id === thread.vendorCompanyId)?.name ?? "Unknown Vendor";
+                                const vendorName =
+                                  thread.vendorCompanyName ??
+                                  companies.find((c) => c.id === thread.vendorCompanyId)?.name ??
+                                  (locale === "ja" ? "不明な開発会社" : "Unknown Vendor");
                                 return (
                                   <div
                                     key={thread.id}
@@ -3217,6 +4003,18 @@ export function OffshoreMatchApp({
                                       className="min-w-0 flex-1 rounded-md px-2 py-2 text-left text-xs font-semibold"
                                     >
                                       <span className="block truncate">{vendorName}</span>
+                                      <span className="mt-1 flex flex-wrap items-center gap-1">
+                                        {thread.notificationKind ? (
+                                          <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${threadNotificationTone(thread.notificationKind)}`}>
+                                            {threadNotificationLabel(thread.notificationKind, locale, "buyer")}
+                                          </span>
+                                        ) : null}
+                                        {(thread.unreadCount ?? 0) > 0 ? (
+                                          <span className="rounded-full border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">
+                                            {locale === "ja" ? `未読 ${thread.unreadCount}` : `${thread.unreadCount} unread`}
+                                          </span>
+                                        ) : null}
+                                      </span>
                                     </button>
                                     <button
                                       type="button"
@@ -3241,7 +4039,9 @@ export function OffshoreMatchApp({
                       <div className="grid gap-2">
                         <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                           {(companies.find((company) => company.id === threads.find((thread) => thread.id === activeThreadId)?.vendorCompanyId)?.plan ?? "basic") === "translation"
-                            ? (locale === "ja" ? `この開発会社は翻訳付きプランです。原文と ${languageLabel(companies.find((company) => company.id === threads.find((thread) => thread.id === activeThreadId)?.vendorCompanyId)?.preferredLanguage)} 翻訳を表示します。` : `This vendor uses the translation plan. The chat shows original text plus ${languageLabel(companies.find((company) => company.id === threads.find((thread) => thread.id === activeThreadId)?.vendorCompanyId)?.preferredLanguage)} translation.`)
+                            ? (locale === "ja"
+                              ? `この開発会社は翻訳付きプランです。原文と ${languageLabel(companies.find((company) => company.id === threads.find((thread) => thread.id === activeThreadId)?.vendorCompanyId)?.preferredLanguage, locale)} 翻訳を表示します。`
+                              : `This vendor uses the translation plan. The chat shows the original text plus a ${languageLabel(companies.find((company) => company.id === threads.find((thread) => thread.id === activeThreadId)?.vendorCompanyId)?.preferredLanguage, locale)} translation.`)
                             : (locale === "ja" ? "このチャットは原文表示です。" : "This chat shows original text only.")}
                         </div>
                         <div ref={buyerMessagesContainerRef} className="max-h-[520px] min-h-[300px] space-y-2 overflow-auto rounded-xl border border-slate-200 bg-white p-3 md:min-h-[380px]">
@@ -3252,6 +4052,18 @@ export function OffshoreMatchApp({
                                 {msg.body}
                               </div>
                             ) : (
+                            (() => {
+                              const vendorCompany = companies.find((company) => company.id === threads.find((thread) => thread.id === activeThreadId)?.vendorCompanyId);
+                              const isBuyerMessage = msg.sender === "buyer";
+                              const secondaryTranslation = translatedTextForViewer(msg, isBuyerMessage ? "company" : "ja");
+                              const showSecondaryTranslation = Boolean(secondaryTranslation && secondaryTranslation !== msg.body);
+                              const primaryBody = isBuyerMessage ? msg.body : (secondaryTranslation || msg.body);
+                              const secondaryBody = isBuyerMessage ? secondaryTranslation : (secondaryTranslation ? msg.body : null);
+                              const secondaryLabel = isBuyerMessage
+                                ? chatTranslationLabel("company", msg.translations.companyLanguage ?? vendorCompany?.preferredLanguage, locale)
+                                : originalLabel(locale);
+
+                              return (
                             <div
                               key={msg.id}
                               className={`max-w-[92%] rounded-lg px-3 py-2 text-sm ${
@@ -3262,24 +4074,24 @@ export function OffshoreMatchApp({
                                 <p className="mb-1 text-[11px] font-semibold text-slate-500">
                                   {counterpartyDisplay(
                                     threads.find((thread) => thread.id === activeThreadId)?.vendorCompanyName ??
-                                      companies.find((company) => company.id === threads.find((thread) => thread.id === activeThreadId)?.vendorCompanyId)?.name,
+                                      vendorCompany?.name,
                                     threads.find((thread) => thread.id === activeThreadId)?.vendorContactName
                                   )}
                                 </p>
                               ) : null}
-                              <p className="whitespace-pre-wrap">{msg.body}</p>
-                              {(companies.find((company) => company.id === threads.find((thread) => thread.id === activeThreadId)?.vendorCompanyId)?.plan ?? "basic") === "translation" &&
-                              translatedTextForViewer(msg, msg.sender === "buyer" ? "company" : "ja") &&
-                              translatedTextForViewer(msg, msg.sender === "buyer" ? "company" : "ja") !== msg.body ? (
+                              <p className="whitespace-pre-wrap">{primaryBody}</p>
+                              {(vendorCompany?.plan ?? "basic") === "translation" && showSecondaryTranslation && secondaryBody ? (
                                 <div className={`mt-2 rounded-md px-2 py-2 text-xs ${msg.sender === "buyer" ? "bg-white/10 text-slate-200" : "bg-white text-slate-600"}`}>
-                                  <p className="mb-1 font-semibold">{msg.sender === "buyer" ? languageLabel(companies.find((company) => company.id === threads.find((thread) => thread.id === activeThreadId)?.vendorCompanyId)?.preferredLanguage) : (locale === "ja" ? "日本語" : "Japanese")} {locale === "ja" ? "訳" : "translation"}</p>
-                                  <p className="whitespace-pre-wrap">{translatedTextForViewer(msg, msg.sender === "buyer" ? "company" : "ja")}</p>
+                                <p className="mb-1 font-semibold">{secondaryLabel}</p>
+                                  <p className="whitespace-pre-wrap">{secondaryBody}</p>
                                 </div>
                               ) : null}
                               <p className={`mt-1 text-[10px] ${msg.sender === "buyer" ? "text-slate-300" : "text-slate-500"}`}>
                                 {locale === "ja" ? "原文" : "Original"}: {msg.originalLanguage.toUpperCase()}
                               </p>
                             </div>
+                              );
+                            })()
                             )
                           ))}
                           {!threadMessagesLoading && visibleThreadMessages.length === 0 ? <p className="text-xs text-slate-500">{locale === "ja" ? "スレッドを選択してメッセージを開始してください。" : "Select a thread to start messaging."}</p> : null}
@@ -3329,24 +4141,31 @@ export function OffshoreMatchApp({
                             {locale === "ja" ? "最終更新" : "Last updated"}: {activeBuyerDeal ? `${dealPartyLabel(activeBuyerDeal.updatedBy, locale)} / ${new Date(activeBuyerDeal.updatedAt).toLocaleString(locale === "ja" ? "ja-JP" : "en-US")}` : (locale === "ja" ? "未設定" : "Not set")}
                           </p>
                         </div>
-                        <div className="flex items-end gap-2">
-                          <Textarea
-                            ref={buyerThreadInputRef}
-                            rows={1}
-                            className="min-w-0 resize-none overflow-hidden"
-                            value={threadInput}
-                            onChange={(e) => setThreadInput(e.target.value)}
-                            onInput={(e) => autosizeTextarea(e.currentTarget)}
-                            onKeyDown={(e) => {
-                              if (!isSubmitEnter(e)) return;
-                              e.preventDefault();
-                              void handleSendThreadMessage();
-                            }}
-                            placeholder={locale === "ja" ? "メッセージを入力" : "Enter a message"}
-                          />
-                          <Button className="min-w-20 shrink-0 whitespace-nowrap" onClick={handleSendThreadMessage} disabled={threadSending}>
-                            {threadSending ? (locale === "ja" ? "送信中..." : "Sending...") : locale === "ja" ? "送信" : "Send"}
-                          </Button>
+                        <div className="grid gap-2">
+                          <div className="flex items-end gap-2">
+                            <Textarea
+                              ref={buyerThreadInputRef}
+                              rows={1}
+                              className="min-w-0 resize-none overflow-hidden"
+                              value={threadInput}
+                              onChange={(e) => setThreadInput(e.target.value)}
+                              onInput={(e) => autosizeTextarea(e.currentTarget)}
+                              onKeyDown={(e) => {
+                                if (!isSubmitEnter(e)) return;
+                                e.preventDefault();
+                                void handleSendThreadMessage();
+                              }}
+                              placeholder={locale === "ja" ? "メッセージを入力" : "Enter a message"}
+                            />
+                            <Button className="min-w-20 shrink-0 whitespace-nowrap" onClick={handleSendThreadMessage} disabled={threadSending}>
+                              {threadSending ? (locale === "ja" ? "送信中..." : "Sending...") : locale === "ja" ? "送信" : "Send"}
+                            </Button>
+                          </div>
+                          <p className="text-[11px] text-slate-500">
+                            {locale === "ja"
+                              ? "改行は Enter、送信は Cmd/Ctrl + Enter"
+                              : "Press Enter for a new line. Use Cmd/Ctrl + Enter to send."}
+                          </p>
                         </div>
                         {threadMessageInfo ? <p className="text-xs text-slate-600">{threadMessageInfo}</p> : null}
                       </div>
@@ -3401,25 +4220,37 @@ export function OffshoreMatchApp({
                     </div>
                   </Card>
 
-                  <Card className="grid gap-3 border-slate-100 bg-slate-950 p-5 shadow-none">
-                    <div className="flex items-center gap-2 text-slate-100">
-                      <MessageSquareMore className="h-4 w-4" />
+                  <Card className="grid gap-3 border-slate-100 bg-gradient-to-br from-white via-slate-50 to-cyan-50 p-5 shadow-none">
+                    <div className="flex items-center gap-2 text-slate-900">
+                      <div className="rounded-xl bg-cyan-100 p-2 text-cyan-700">
+                        <MessageSquareMore className="h-4 w-4" />
+                      </div>
                       <p className="text-sm font-semibold">{locale === "ja" ? "過去チャット概要" : "Recent Chats"}</p>
                     </div>
                     <div className="grid gap-2">
                       {vendorThreadOverview.slice(0, 3).map((thread) => (
-                        <div key={thread.threadId} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                        <div key={thread.threadId} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                           <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm font-semibold text-white">{thread.counterpartyLabel}</p>
+                            <p className="text-sm font-semibold text-slate-900">{thread.counterpartyLabel}</p>
                             <div className="flex items-center gap-2">
-                              <span className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-200">{dealStatusLabel(thread.status, locale)}</span>
-                              <p className="text-[11px] text-slate-400">{new Date(thread.lastMessageAt).toLocaleDateString(locale === "ja" ? "ja-JP" : "en-US")}</p>
+                              {thread.notificationKind ? (
+                                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${threadNotificationTone(thread.notificationKind)}`}>
+                                  {threadNotificationLabel(thread.notificationKind, locale, "vendor")}
+                                </span>
+                              ) : null}
+                              {(thread.unreadCount ?? 0) > 0 ? (
+                                <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+                                  {locale === "ja" ? `未読 ${thread.unreadCount}` : `${thread.unreadCount} unread`}
+                                </span>
+                              ) : null}
+                              <span className="rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold text-cyan-700">{dealStatusLabel(thread.status, locale)}</span>
+                              <p className="text-[11px] text-slate-500">{new Date(thread.lastMessageAt).toLocaleDateString(locale === "ja" ? "ja-JP" : "en-US")}</p>
                             </div>
                           </div>
-                          <p className="mt-2 text-xs leading-6 text-slate-300">{thread.lastMessage}</p>
+                          <p className="mt-2 text-xs leading-6 text-slate-600">{thread.lastMessage}</p>
                         </div>
                       ))}
-                      {vendorThreadOverview.length === 0 ? <p className="text-xs text-slate-400">{locale === "ja" ? "まだ問い合わせ履歴はありません。" : "No inquiry history yet."}</p> : null}
+                      {vendorThreadOverview.length === 0 ? <p className="text-xs text-slate-500">{locale === "ja" ? "まだ問い合わせ履歴はありません。" : "No inquiry history yet."}</p> : null}
                     </div>
                   </Card>
                 </div>
@@ -3553,7 +4384,7 @@ export function OffshoreMatchApp({
                                 className="font-semibold text-blue-700 underline underline-offset-2"
                                 href={normalizeExternalUrl(activeVendorCompany.websiteUrl)}
                                 target="_blank"
-                                rel="noreferrer"
+                                rel="noopener noreferrer"
                               >
                                 {activeVendorCompany.websiteUrl}
                               </a>
@@ -3663,7 +4494,7 @@ export function OffshoreMatchApp({
                             <a
                               href={normalizeExternalUrl(vendorProfileForm.websiteUrl)}
                               target="_blank"
-                              rel="noreferrer"
+                              rel="noopener noreferrer"
                               className="mt-2 inline-block text-sm font-semibold text-blue-700 underline underline-offset-2"
                             >
                               {vendorProfileForm.websiteUrl}
@@ -3937,12 +4768,10 @@ export function OffshoreMatchApp({
                     <Card className="border-slate-100 bg-slate-50 p-4 shadow-none">
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Plan</p>
                       <p className="mt-2 font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">
-                        {vendorBilling?.translationEnabled ? "Translation" : "Standard"}
+                        {effectiveVendorPlan === "translation" ? "Translation" : "Standard"}
                       </p>
                       <p className="mt-1 text-sm text-slate-500">
-                        {vendorBilling
-                          ? `¥${vendorBilling.monthlyPriceJpy.toLocaleString(locale === "ja" ? "ja-JP" : "en-US")}/${locale === "ja" ? "月" : "mo"}`
-                          : monthlyPriceLabel(activeVendorCompany.plan)}
+                        {monthlyPriceLabel(effectiveVendorPlan)}
                       </p>
                     </Card>
                     <Card className="border-slate-100 bg-slate-50 p-4 shadow-none">
@@ -4031,6 +4860,48 @@ export function OffshoreMatchApp({
                     <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-slate-700">
                       <p className="font-semibold text-rose-700">{locale === "ja" ? "掲載を再開するには決済の更新が必要です" : "Billing Update Required to Relist"}</p>
                       <p className="mt-2 leading-7">{locale === "ja" ? "現在は公開ディレクトリへの掲載と有料機能が停止しています。決済を完了すると再び掲載を再開できます。" : "Your public listing and paid features are currently stopped. Complete billing to relist your company."}</p>
+                    </div>
+                  ) : null}
+                  {!vendorBillingActive ? (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{locale === "ja" ? "再開するプランを選択" : "Choose the Plan to Restart"}</p>
+                          <p className="mt-1 text-sm text-slate-600">
+                            {locale === "ja"
+                              ? "停止中のアカウントは、再開時にスタンダードまたは翻訳付きのどちらでも選べます。"
+                              : "When reactivating an inactive account, you can restart on either Standard or Translation."}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-4 grid gap-3 md:grid-cols-2">
+                        <button
+                          type="button"
+                          onClick={() => setRestartPlanSelection("basic")}
+                          className={`rounded-2xl border p-4 text-left transition ${restartPlanSelection === "basic" ? "border-blue-600 bg-blue-50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}
+                        >
+                          <p className="text-sm font-semibold text-slate-900">{locale === "ja" ? "スタンダード" : "Standard"}</p>
+                          <p className="mt-1 text-xl font-bold text-slate-900">¥5,000<span className="ml-1 text-sm font-medium text-slate-500">/{locale === "ja" ? "月" : "mo"}</span></p>
+                          <p className="mt-2 text-sm leading-6 text-slate-600">
+                            {locale === "ja"
+                              ? "通常掲載とチャット機能を利用できます。"
+                              : "Includes the standard listing and regular chat features."}
+                          </p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRestartPlanSelection("translation")}
+                          className={`rounded-2xl border p-4 text-left transition ${restartPlanSelection === "translation" ? "border-cyan-600 bg-cyan-50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}
+                        >
+                          <p className="text-sm font-semibold text-slate-900">{locale === "ja" ? "翻訳付き" : "Translation"}</p>
+                          <p className="mt-1 text-xl font-bold text-slate-900">¥10,000<span className="ml-1 text-sm font-medium text-slate-500">/{locale === "ja" ? "月" : "mo"}</span></p>
+                          <p className="mt-2 text-sm leading-6 text-slate-600">
+                            {locale === "ja"
+                              ? "通常掲載に加え、プロフィールとチャットの翻訳機能を利用できます。"
+                              : "Adds profile and chat translation on top of the standard listing."}
+                          </p>
+                        </button>
+                      </div>
                     </div>
                   ) : null}
                   {vendorBillingActive && vendorOnStandardPlan && !vendorBillingCancelScheduled ? (
@@ -4129,7 +5000,11 @@ export function OffshoreMatchApp({
                       <Button variant="secondary" onClick={handleOpenBillingPortal}>{locale === "ja" ? "請求ポータル" : "Billing Portal"}</Button>
                     ) : (
                       <Button variant="secondary" onClick={handleStartVendorCheckout} disabled={billingActionLoading === "checkout"}>
-                        {billingActionLoading === "checkout" ? (locale === "ja" ? "決済画面を準備中..." : "Preparing checkout...") : (locale === "ja" ? "決済を開始" : "Start Checkout")}
+                        {billingActionLoading === "checkout"
+                          ? (locale === "ja" ? "決済画面を準備中..." : "Preparing checkout...")
+                          : restartPlanSelection === "translation"
+                            ? (locale === "ja" ? "翻訳付きで決済を開始" : "Start Translation Checkout")
+                            : (locale === "ja" ? "スタンダードで決済を開始" : "Start Standard Checkout")}
                       </Button>
                     )}
                     {vendorBillingCancelScheduled ? (
@@ -4216,10 +5091,14 @@ export function OffshoreMatchApp({
                       </Field>
                       <Field label={locale === "ja" ? "技術スタック（カンマ区切り）" : "Tech Stack (comma separated)"}>
                         <Input
-                          value={portfolioDraft.technologies.join(", ")}
-                          onChange={(e) => updatePortfolioDraft({
-                            technologies: e.target.value.split(",").map((item) => item.trim()).filter(Boolean)
-                          })}
+                          value={portfolioTechnologiesInput}
+                          onChange={(e) => {
+                            const nextValue = e.target.value;
+                            setPortfolioTechnologiesInput(nextValue);
+                            updatePortfolioDraft({
+                              technologies: nextValue.split(",").map((item) => item.trim()).filter(Boolean)
+                            });
+                          }}
                         />
                       </Field>
                       <Field label={locale === "ja" ? "成果 / ビジネス効果" : "Outcome / Business Impact"}>
@@ -4414,6 +5293,18 @@ export function OffshoreMatchApp({
                                   className="min-w-0 flex-1 rounded-md px-2 py-2 text-left text-xs font-semibold"
                                 >
                                   <span className="block truncate">{thread.buyerCompanyName ?? thread.buyerEmail}</span>
+                                  <span className="mt-1 flex flex-wrap items-center gap-1">
+                                    {thread.notificationKind ? (
+                                      <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${threadNotificationTone(thread.notificationKind)}`}>
+                                        {threadNotificationLabel(thread.notificationKind, locale, "vendor")}
+                                      </span>
+                                    ) : null}
+                                    {(thread.unreadCount ?? 0) > 0 ? (
+                                      <span className="rounded-full border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">
+                                        {locale === "ja" ? `未読 ${thread.unreadCount}` : `${thread.unreadCount} unread`}
+                                      </span>
+                                    ) : null}
+                                  </span>
                                 </button>
                                 <button
                                   type="button"
@@ -4451,6 +5342,17 @@ export function OffshoreMatchApp({
                               {msg.body}
                             </div>
                           ) : (
+                          (() => {
+                            const isVendorMessage = msg.sender === "vendor";
+                            const secondaryTranslation = translatedTextForViewer(msg, isVendorMessage ? "ja" : "company");
+                            const showSecondaryTranslation = Boolean(secondaryTranslation && secondaryTranslation !== msg.body);
+                            const primaryBody = isVendorMessage ? msg.body : (secondaryTranslation || msg.body);
+                            const secondaryBody = isVendorMessage ? secondaryTranslation : (secondaryTranslation ? msg.body : null);
+                            const secondaryLabel = isVendorMessage
+                              ? chatTranslationLabel("ja", activeVendorCompany.preferredLanguage, locale)
+                              : originalLabel(locale);
+
+                            return (
                           <div
                             key={msg.id}
                             className={`max-w-[92%] rounded-lg px-3 py-2 text-sm ${
@@ -4466,17 +5368,19 @@ export function OffshoreMatchApp({
                                 )}
                               </p>
                             ) : null}
-                            <p className="whitespace-pre-wrap">{msg.body}</p>
-                            {vendorBilling?.translationEnabled && translatedTextForViewer(msg, msg.sender === "vendor" ? "ja" : "company") && translatedTextForViewer(msg, msg.sender === "vendor" ? "ja" : "company") !== msg.body ? (
+                            <p className="whitespace-pre-wrap">{primaryBody}</p>
+                            {vendorBilling?.translationEnabled && showSecondaryTranslation && secondaryBody ? (
                               <div className={`mt-2 rounded-md px-2 py-2 text-xs ${msg.sender === "vendor" ? "bg-white/10 text-slate-200" : "bg-white text-slate-600"}`}>
-                                <p className="mb-1 font-semibold">{msg.sender === "vendor" ? (locale === "ja" ? "日本語" : "Japanese") : `${languageLabel(activeVendorCompany.preferredLanguage, locale)}${locale === "ja" ? "訳" : " Translation"}`}</p>
-                                <p className="whitespace-pre-wrap">{translatedTextForViewer(msg, msg.sender === "vendor" ? "ja" : "company")}</p>
+                                <p className="mb-1 font-semibold">{secondaryLabel}</p>
+                                <p className="whitespace-pre-wrap">{secondaryBody}</p>
                               </div>
                             ) : null}
                             <p className={`mt-1 text-[10px] ${msg.sender === "vendor" ? "text-slate-300" : "text-slate-500"}`}>
                               {locale === "ja" ? "原文" : "Original"}: {msg.originalLanguage.toUpperCase()}
                             </p>
                           </div>
+                            );
+                          })()
                           )
                         ))}
                         {!vendorThreadMessagesLoading && visibleVendorThreadMessages.length === 0 ? <p className="text-xs text-slate-500">{locale === "ja" ? "スレッドを選択して返信できます。" : "Select a thread to reply."}</p> : null}
@@ -4526,24 +5430,31 @@ export function OffshoreMatchApp({
                           {locale === "ja" ? "最終更新" : "Last updated"}: {activeVendorDeal ? `${dealPartyLabel(activeVendorDeal.updatedBy, locale)} / ${new Date(activeVendorDeal.updatedAt).toLocaleString(locale === "ja" ? "ja-JP" : "en-US")}` : (locale === "ja" ? "未設定" : "Not set")}
                         </p>
                       </div>
-                      <div className="flex items-end gap-2">
-                        <Textarea
-                          ref={vendorThreadInputRef}
-                          rows={1}
-                          className="min-w-0 resize-none overflow-hidden"
-                          value={vendorThreadInput}
-                          onChange={(e) => setVendorThreadInput(e.target.value)}
-                          onInput={(e) => autosizeTextarea(e.currentTarget)}
-                          onKeyDown={(e) => {
-                              if (!isSubmitEnter(e)) return;
-                              e.preventDefault();
-                            void handleSendVendorThreadMessage();
-                          }}
-                          placeholder={locale === "ja" ? "返信メッセージを入力" : "Enter a reply"}
-                        />
-                        <Button className="min-w-20 shrink-0 whitespace-nowrap" onClick={handleSendVendorThreadMessage} disabled={vendorThreadSending}>
-                          {vendorThreadSending ? (locale === "ja" ? "送信中..." : "Sending...") : (locale === "ja" ? "送信" : "Send")}
-                        </Button>
+                      <div className="grid gap-2">
+                        <div className="flex items-end gap-2">
+                          <Textarea
+                            ref={vendorThreadInputRef}
+                            rows={1}
+                            className="min-w-0 resize-none overflow-hidden"
+                            value={vendorThreadInput}
+                            onChange={(e) => setVendorThreadInput(e.target.value)}
+                            onInput={(e) => autosizeTextarea(e.currentTarget)}
+                            onKeyDown={(e) => {
+                                if (!isSubmitEnter(e)) return;
+                                e.preventDefault();
+                              void handleSendVendorThreadMessage();
+                            }}
+                            placeholder={locale === "ja" ? "返信メッセージを入力" : "Enter a reply"}
+                          />
+                          <Button className="min-w-20 shrink-0 whitespace-nowrap" onClick={handleSendVendorThreadMessage} disabled={vendorThreadSending}>
+                            {vendorThreadSending ? (locale === "ja" ? "送信中..." : "Sending...") : (locale === "ja" ? "送信" : "Send")}
+                          </Button>
+                        </div>
+                        <p className="text-[11px] text-slate-500">
+                          {locale === "ja"
+                            ? "改行は Enter、送信は Cmd/Ctrl + Enter"
+                            : "Press Enter for a new line. Use Cmd/Ctrl + Enter to send."}
+                        </p>
                       </div>
                       {vendorThreadMessageInfo ? <p className="text-xs text-slate-600">{vendorThreadMessageInfo}</p> : null}
                     </div>

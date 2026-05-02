@@ -9,8 +9,8 @@ export function SiteFooter() {
     <footer className="mt-16 border-t border-slate-200 bg-white/70">
       <div className="mx-auto grid w-full max-w-7xl gap-4 px-4 py-8 md:grid-cols-3">
         <div>
-          <p className="font-[family-name:var(--font-display)] text-lg font-extrabold">OffshoreMatch</p>
-          <p className="mt-2 text-sm text-slate-600">{locale === "ja" ? "日本企業向けオフショア開発マッチングSaaS" : "Offshore development matching SaaS for Japanese companies"}</p>
+          <p className="font-[family-name:var(--font-display)] text-lg font-extrabold">offshoredevelopment.com</p>
+          <p className="mt-2 text-sm text-slate-600">{locale === "ja" ? "日本企業向けオフショア開発プラットフォーム" : "Offshore development platform for Japanese companies"}</p>
         </div>
         <div>
           <p className="text-sm font-semibold text-slate-800">{locale === "ja" ? "メニュー" : "Menu"}</p>

@@ -11,7 +11,7 @@ import { SiteNav } from "@/components/marketing/site-nav";
 const benefits = [
   "比較工数を削減し、候補選定を高速化",
   "要件相談から候補抽出まで一画面で完結",
-  "審査済み企業の中から安心して選べる"
+  "条件が整った掲載企業を比較しやすい"
 ];
 
 const flow = [
@@ -26,12 +26,12 @@ export default function BuyerMarketPage() {
     ? [
         "比較工数を削減し、候補選定を高速化",
         "要件相談から候補抽出まで一画面で完結",
-        "審査済み企業の中から安心して選べる"
+        "条件が整った掲載企業を比較しやすい"
       ]
     : [
         "Reduce comparison effort and shortlist faster",
         "Go from requirements to candidates in one flow",
-        "Choose from reviewed companies with more confidence"
+        "Compare listed vendors with the key information already in place"
       ];
   const flow = locale === "ja"
     ? [
@@ -57,18 +57,18 @@ export default function BuyerMarketPage() {
                   <>
                     発注企業向け
                     <br />
-                    パートナー探索ページ
+                    比較と相談の導線
                   </>
                 ) : (
                   <>
-                    Buyer-facing
+                    A buyer flow built for
                     <br />
-                    partner discovery page
+                    comparison and discovery
                   </>
                 )}
               </h1>
               <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-                {locale === "ja" ? "候補探索から要件整理、メッセージでの初回連絡まで。調達チームが必要とする初期検討プロセスを一気通貫でサポートします。" : "From discovery to requirements clarification and first contact, this flow supports the early-stage evaluation work procurement teams actually need."}
+                {locale === "ja" ? "候補探索から要件整理、初回問い合わせまで。調達チームが必要とする初期検討プロセスを一つの流れで支えます。" : "From discovery to requirements clarification and first contact, this flow supports the early-stage evaluation work procurement teams actually need."}
               </p>
             </div>
             <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl">

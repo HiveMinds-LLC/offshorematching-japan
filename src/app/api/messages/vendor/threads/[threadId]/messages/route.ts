@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { addMessageToThread, getVendorOwnedThreadByUserId, listMessagesByThread } from "@/lib/server/api-store";
+import { addMessageToThread, getVendorOwnedThreadByUserId, listMessagesByThread, markThreadReadByUserId } from "@/lib/server/api-store";
 import { getCurrentVendorSession } from "@/lib/server/vendor-auth";
 
 type Params = { params: Promise<{ threadId: string }> };
 
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(request: Request, { params }: Params) {
   const vendor = await getCurrentVendorSession();
   if (!vendor) return NextResponse.json({ error: "開発会社ログインが必要です。" }, { status: 401 });
 
@@ -13,6 +13,11 @@ export async function GET(_request: Request, { params }: Params) {
   const thread = await getVendorOwnedThreadByUserId(threadId, vendor.id);
   if (!thread) {
     return NextResponse.json({ error: "Thread not found." }, { status: 404 });
+  }
+
+  const shouldMarkRead = new URL(request.url).searchParams.get("markRead") === "1";
+  if (shouldMarkRead) {
+    await markThreadReadByUserId(threadId, vendor.id);
   }
 
   const messages = await listMessagesByThread(threadId);

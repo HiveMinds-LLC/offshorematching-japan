@@ -5,8 +5,8 @@ import { ToasterProvider } from "@/components/ui/toaster";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "OffshoreMatch | 日本企業向け開発マッチングSaaS",
-  description: "日本企業向けのオフショア開発会社マッチングSaaSプロトタイプ"
+  title: "offshoredevelopment.com | 日本企業向けオフショア開発プラットフォーム",
+  description: "日本企業向けのオフショア開発会社ディレクトリ、案件マッチング、企業間メッセージをまとめたプラットフォーム"
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

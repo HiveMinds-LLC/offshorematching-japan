@@ -50,6 +50,8 @@ export type Company = {
   services: string[];
   portfolioProjects: PortfolioProject[];
   completedEngagements?: CompletedEngagementRecord[];
+  listingScore?: number;
+  listingCompletedProjectsCount?: number;
   minRate: number;
   maxRate: number;
   teamSize: number;
@@ -80,6 +82,7 @@ export type BoostState = Record<string, { endsAt: string; bonus: number }>;
 
 export type BuyerCriteria = {
   technologies: string[];
+  projectTypes: PortfolioProjectType[];
   budgetCeiling: number | null;
   teamNeeded: number | null;
   englishRequired: boolean;
@@ -118,6 +121,7 @@ export type MessageTranslations = {
   ja?: string;
   en?: string;
   company?: string;
+  companyLanguage?: VendorPreferredLanguage;
 };
 
 export type MessageType = "text" | "system";
@@ -173,6 +177,39 @@ export type ProjectHistoryRecord = {
   technologies: string[];
   status: "completed" | "active";
   deliveredAt: string;
+};
+
+export type AdminBuyerSummary = {
+  id: string;
+  companyName: string;
+  industry: string;
+  contactName: string;
+  email: string;
+  savedCompanyCount: number;
+  activeProjectCount: number;
+  completedProjectCount: number;
+  createdAt?: string;
+};
+
+export type AdminVendorSummary = {
+  company: Company;
+  contactEmail: string;
+  billingStatus: BillingStatus;
+  currentPeriodEnd?: string;
+  pendingPlan?: PlanKey;
+  listed: boolean;
+  publishedAt?: string;
+  applicationStatus?: VendorApplicationStatus;
+  createdAt?: string;
+};
+
+export type AdminDashboardSummary = {
+  buyerCount: number;
+  vendorCount: number;
+  listedVendorCount: number;
+  activeBillingCount: number;
+  completedJobCount: number;
+  activeMatchCount: number;
 };
 
 export type DealStatus = "相談中" | "進行中" | "完了";

@@ -1,6 +1,6 @@
 import { AppTopbar } from "@/components/app/app-topbar";
 import { OffshoreMatchApp } from "@/components/offshorematch-app";
-import { getAppUserRole, getBuyerByUserId, getVendorApplicationByUserId, getVendorBillingAccount, getVendorCompanyByUserId, isSupabaseConfigured, listSavedCompanyIdsByBuyerUserId } from "@/lib/server/api-store";
+import { getAppUserRole, getBuyerByUserId, getMarketplaceStats, getVendorApplicationByUserId, getVendorBillingAccount, getVendorCompanyByUserId, isSupabaseConfigured, listCompaniesForMarketplace, listSavedCompanyIdsByBuyerUserId } from "@/lib/server/api-store";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function AppPage({
@@ -13,6 +13,10 @@ export default async function AppPage({
   let initialVendorCompany = null;
   let initialVendorApplication = null;
   let initialVendorBilling = null;
+  const [initialCompanies, initialMarketplaceStats] = await Promise.all([
+    listCompaniesForMarketplace(),
+    getMarketplaceStats()
+  ]);
   let initialRole: "guest" | "buyer" | "vendor" | "admin" = "guest";
   let initialSection:
     | "marketplace"
@@ -97,6 +101,8 @@ export default async function AppPage({
       <AppTopbar title="アプリ" titleEn="App" subtitle="マーケットプレイス・ログイン・マッチング" subtitleEn="Marketplace, login, and matching" />
       <main>
         <OffshoreMatchApp
+          initialCompanies={initialCompanies}
+          initialMarketplaceStats={initialMarketplaceStats}
           initialBuyer={initialBuyer}
           initialVendorCompany={initialVendorCompany}
           initialVendorApplication={initialVendorApplication}

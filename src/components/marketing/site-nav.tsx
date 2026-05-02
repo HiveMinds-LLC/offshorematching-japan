@@ -17,7 +17,7 @@ export function SiteNav() {
     <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/90 backdrop-blur">
       <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3">
         <Link href="/" className="font-[family-name:var(--font-display)] text-lg font-extrabold text-slate-900">
-          OffshoreMatch
+          offshoredevelopment.com
         </Link>
         <nav className="hidden items-center gap-5 md:flex">
           {navItems.map((item) => (

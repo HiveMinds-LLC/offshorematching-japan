@@ -1,17 +1,21 @@
 import { NextResponse } from "next/server";
 
-import { addMessageToThread, getBuyerOwnedThreadByUserId, listMessagesByThread } from "@/lib/server/api-store";
+import { addMessageToThread, getBuyerOwnedThreadByUserId, listMessagesByThread, markThreadReadByUserId } from "@/lib/server/api-store";
 import { getCurrentBuyerSession } from "@/lib/server/buyer-auth";
 
 type Params = { params: Promise<{ threadId: string }> };
 
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(request: Request, { params }: Params) {
   const buyer = await getCurrentBuyerSession();
   if (!buyer) return NextResponse.json({ error: "ログインが必要です。" }, { status: 401 });
 
   const { threadId } = await params;
   const thread = await getBuyerOwnedThreadByUserId(threadId, buyer.id, buyer.email);
   if (!thread) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
+  const shouldMarkRead = new URL(request.url).searchParams.get("markRead") === "1";
+  if (shouldMarkRead) {
+    await markThreadReadByUserId(threadId, buyer.id);
+  }
   const messages = await listMessagesByThread(threadId);
   return NextResponse.json({ messages });
 }
