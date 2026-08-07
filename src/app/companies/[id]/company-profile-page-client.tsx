@@ -18,6 +18,7 @@ type CompanyProfilePageClientProps = {
   initialSessionRole: "guest" | "buyer" | "vendor" | "admin";
   initialBuyer: BuyerOrganization | null;
   initialFavoriteCompanyIds: string[];
+  isPreview?: boolean;
 };
 
 function normalizeExternalUrl(url?: string) {
@@ -134,7 +135,8 @@ export function CompanyProfilePageClient({
   initialCompany,
   initialSessionRole,
   initialBuyer,
-  initialFavoriteCompanyIds
+  initialFavoriteCompanyIds,
+  isPreview = false
 }: CompanyProfilePageClientProps) {
   const { locale } = useLocale();
   const router = useRouter();
@@ -210,6 +212,13 @@ export function CompanyProfilePageClient({
     <div>
       <AppTopbar title={locale === "ja" ? "会社プロフィール" : "Company Profile"} subtitle={locale === "ja" ? "公開ページ" : "Public Page"} />
       <main className="mx-auto w-full max-w-4xl px-4 pb-12 pt-8">
+        {isPreview ? (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {locale === "ja"
+              ? "このページはプレビューです。決済と必須プロフィール入力が完了するまで、他のユーザーには表示されません。"
+              : "This page is a preview. It won't be visible to other users until payment and required profile fields are complete."}
+          </div>
+        ) : null}
         <Card className="grid gap-4 p-6">
           <div className="flex items-center justify-between gap-3">
             <h1 className="section-title">{locale === "ja" ? "開発会社プロフィール" : "Vendor Profile"}</h1>

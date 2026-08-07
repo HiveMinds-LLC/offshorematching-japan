@@ -9,6 +9,7 @@ import { useLocale } from "@/components/i18n/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useToast } from "@/components/ui/toaster";
 import { TERMS_VERSION } from "@/lib/legal";
 
@@ -232,7 +233,7 @@ export default function VendorRegisterPage() {
                 </label>
                 <label className="grid gap-1.5 sm:col-span-2">
                   <span className="field-label">{locale === "ja" ? "パスワード" : "Password"}</span>
-                  <Input type="password" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
+                  <PasswordInput value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
                   <span className="text-xs text-slate-500">{locale === "ja" ? "ログインに使う必須パスワードです。8文字以上かつ数字を1つ以上含めてください。" : "This password will be used for sign-in. Use at least 8 characters and include at least 1 number."}</span>
                 </label>
               </div>

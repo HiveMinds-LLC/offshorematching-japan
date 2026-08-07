@@ -374,7 +374,7 @@ function scoreCompany(company: Company, criteria: BuyerCriteria) {
   };
 }
 
-export function runTierAwareMatch(companies: Company[], criteria: BuyerCriteria, _unusedBoostMap = {}, limit = 6): MatchResult[] {
+export function runTierAwareMatch(companies: Company[], criteria: BuyerCriteria, limit = 6): MatchResult[] {
   return companies
     .map((company) => {
       const result = scoreCompany(company, criteria);

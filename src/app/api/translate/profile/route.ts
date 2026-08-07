@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 
 import type { PortfolioProject, VendorPreferredLanguage } from "@/lib/domain/types";
 import { googleTranslateTexts } from "@/lib/server/google-translate";
+import { getCurrentVendorSession } from "@/lib/server/vendor-auth";
 
 export async function POST(request: Request) {
+  const vendor = await getCurrentVendorSession();
+  if (!vendor) return NextResponse.json({ error: "開発会社ログインが必要です。" }, { status: 401 });
+
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
 

@@ -8,18 +8,6 @@ import { SectionReveal } from "@/components/marketing/section-reveal";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { SiteNav } from "@/components/marketing/site-nav";
 
-const benefits = [
-  "比較工数を削減し、候補選定を高速化",
-  "要件相談から候補抽出まで一画面で完結",
-  "条件が整った掲載企業を比較しやすい"
-];
-
-const flow = [
-  { title: "相談入力", text: "必要技術・予算・体制をチャットで入力" },
-  { title: "候補比較", text: "候補会社を比較し、優先度を整理" },
-  { title: "商談開始", text: "そのまま企業間メッセージで連絡" }
-];
-
 export default function BuyerMarketPage() {
   const { locale } = useLocale();
   const benefits = locale === "ja"

@@ -8,18 +8,6 @@ import { SectionReveal } from "@/components/marketing/section-reveal";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { SiteNav } from "@/components/marketing/site-nav";
 
-const benefits = [
-  "日本企業からの相談に継続露出",
-  "月額5,000円で会社情報を公開",
-  "決済とプロフィール入力完了後にすぐ掲載開始"
-];
-
-const requirements = [
-  { title: "会社情報", text: "会社紹介・Webサイト・公開連絡先を準備" },
-  { title: "対応範囲", text: "技術スタック・単価帯・体制人数を明確化" },
-  { title: "掲載開始", text: "決済完了と必須プロフィール入力後に公開ディレクトリへ掲載" }
-];
-
 export default function VendorMarketPage() {
   const { locale } = useLocale();
   const benefits = locale === "ja"
