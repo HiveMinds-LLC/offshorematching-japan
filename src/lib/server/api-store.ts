@@ -1644,7 +1644,16 @@ export async function getVendorBillingAccount(companyId: string) {
   }
   if (!data) return null;
 
+  // Auto-expire manual (non-Stripe) billing accounts that have passed their access end date.
   const billingRow = data as Record<string, unknown>;
+  if (!billingRow.stripe_subscription_id && billingRow.status === "active" && billingRow.current_period_end) {
+    if (new Date(String(billingRow.current_period_end)) < new Date()) {
+      await client.from("vendor_billing_accounts").update({ status: "paused", pause_requested_at: new Date().toISOString() }).eq("company_id", companyId);
+      await client.from("vendor_profiles").update({ active: false }).eq("id", companyId);
+      billingRow.status = "paused";
+    }
+  }
+
   const persistedPendingPlan =
     hasFuturePendingPlan(billingRow)
       ? {
@@ -2096,7 +2105,7 @@ export async function runMatching(criteriaInput: Partial<BuyerCriteria> | null |
     projectTypes: criteriaInput?.projectTypes ?? base.projectTypes
   };
   const companies = await listCompaniesForMarketplace();
-  const matches = runTierAwareMatch(companies, criteria, {}, limit);
+  const matches = runTierAwareMatch(companies, criteria, limit);
   return { criteria, matches, assistantMessage: buildAssistantReply(criteria, matches) };
 }
 
@@ -2769,4 +2778,205 @@ export async function resolveDealStatusProposal(
   }
 
   return { deal: toDealRecord(data as Record<string, unknown>) };
+}
+
+// ─── Admin manual account management ────────────────────────────────────────
+
+export async function adminCreateBuyerAccount(input: {
+  companyName: string;
+  contactName: string;
+  email: string;
+  password: string;
+  industry: string;
+}) {
+  if (!isSupabaseConfigured()) return { ok: false as const, error: "Supabase が設定されていません。" };
+  const service = serviceClient();
+  if (!service) return { ok: false as const, error: "Supabase service client が設定されていません。" };
+
+  const { data: authData, error: authError } = await service.auth.admin.createUser({
+    email: input.email.toLowerCase(),
+    password: input.password,
+    email_confirm: true,
+    user_metadata: { account_type: "buyer", company_name: input.companyName, contact_name: input.contactName }
+  });
+  if (authError || !authData.user) {
+    return { ok: false as const, error: authError?.message ?? "ユーザー作成に失敗しました。" };
+  }
+
+  const { data: profile, error: profileError } = await service
+    .from("buyer_organizations")
+    .insert({
+      owner_user_id: authData.user.id,
+      company_name: input.companyName,
+      industry: input.industry,
+      contact_name: input.contactName
+    })
+    .select("id, company_name, industry, contact_name")
+    .single();
+
+  if (profileError || !profile) {
+    await service.auth.admin.deleteUser(authData.user.id);
+    return { ok: false as const, error: "クライアントプロフィールの作成に失敗しました。" };
+  }
+
+  return {
+    ok: true as const,
+    buyer: {
+      id: String(profile.id),
+      companyName: String(profile.company_name ?? ""),
+      industry: String(profile.industry ?? ""),
+      contactName: String(profile.contact_name ?? ""),
+      email: input.email.toLowerCase(),
+      password: ""
+    }
+  };
+}
+
+export async function adminCreateVendorAccount(input: {
+  companyName: string;
+  contactName: string;
+  email: string;
+  password: string;
+  plan: "basic" | "translation";
+  country: string;
+  accessEndsAt: string;
+}) {
+  if (!isSupabaseConfigured()) return { ok: false as const, error: "Supabase が設定されていません。" };
+  const service = serviceClient();
+  if (!service) return { ok: false as const, error: "Supabase service client が設定されていません。" };
+
+  const { data: authData, error: authError } = await service.auth.admin.createUser({
+    email: input.email.toLowerCase(),
+    password: input.password,
+    email_confirm: true,
+    user_metadata: { account_type: "vendor", company_name: input.companyName, contact_name: input.contactName }
+  });
+  if (authError || !authData.user) {
+    return { ok: false as const, error: authError?.message ?? "ユーザー作成に失敗しました。" };
+  }
+
+  const now = new Date().toISOString();
+  const { data: application, error: appError } = await service
+    .from("vendor_applications")
+    .insert({
+      owner_user_id: authData.user.id,
+      company_name: input.companyName,
+      contact_name: input.contactName,
+      contact_email: input.email.toLowerCase(),
+      country: input.country || "Unknown",
+      summary: "",
+      services: [],
+      portfolio_projects: [],
+      plan_key: input.plan,
+      status: "approved",
+      submitted_at: now,
+      terms_accepted_at: now,
+      terms_version: "1.0",
+      min_rate: 20,
+      max_rate: 40,
+      team_size: 10,
+      english_level: "basic",
+      japanese_support: "basic"
+    })
+    .select("id")
+    .single();
+
+  if (appError || !application) {
+    await service.auth.admin.deleteUser(authData.user.id);
+    return { ok: false as const, error: "開発会社申請の作成に失敗しました。" };
+  }
+
+  const companyId = String(application.id);
+
+  await service.from("vendor_profiles").insert({
+    id: companyId,
+    owner_user_id: authData.user.id,
+    application_id: companyId,
+    company_name: input.companyName,
+    contact_name: input.contactName,
+    country: input.country || "Unknown",
+    summary: "",
+    summary_ja: null,
+    services: [],
+    portfolio_projects: [],
+    plan_key: input.plan,
+    preferred_language: null,
+    website_url: null,
+    public_contact_email: input.email.toLowerCase(),
+    public_contact_phone: null,
+    min_rate: 20,
+    max_rate: 40,
+    team_size: 10,
+    english_level: "basic",
+    japanese_support: "basic",
+    active: true
+  });
+
+  await service.from("vendor_billing_accounts").insert({
+    company_id: companyId,
+    application_id: companyId,
+    company_name: input.companyName,
+    contact_email: input.email.toLowerCase(),
+    plan_key: input.plan,
+    translation_enabled: input.plan === "translation",
+    monthly_price_jpy: input.plan === "translation" ? 10000 : 5000,
+    status: "active",
+    current_period_end: input.accessEndsAt,
+    terms_accepted_at: now,
+    terms_version: "1.0"
+  });
+
+  return { ok: true as const, companyId };
+}
+
+export async function adminRenewVendorAccess(companyId: string, accessEndsAt: string, plan?: "basic" | "translation") {
+  if (!isSupabaseConfigured()) return { ok: false as const, error: "Supabase が設定されていません。" };
+  const service = serviceClient();
+  if (!service) return { ok: false as const, error: "Supabase service client が設定されていません。" };
+
+  const billingUpdate: Record<string, unknown> = { status: "active", current_period_end: accessEndsAt };
+  if (plan) {
+    billingUpdate.plan_key = plan;
+    billingUpdate.translation_enabled = plan === "translation";
+    billingUpdate.monthly_price_jpy = plan === "translation" ? 10000 : 5000;
+  }
+
+  const { error: billingError } = await service
+    .from("vendor_billing_accounts")
+    .update(billingUpdate)
+    .eq("company_id", companyId);
+
+  if (billingError) return { ok: false as const, error: "請求情報の更新に失敗しました。" };
+
+  await service.from("vendor_profiles").update({ active: true, ...(plan ? { plan_key: plan } : {}) }).eq("id", companyId);
+  await service.from("vendor_applications").update({ status: "approved", ...(plan ? { plan_key: plan } : {}) }).eq("id", companyId);
+
+  const { data } = await service.from("vendor_billing_accounts").select("*").eq("company_id", companyId).maybeSingle();
+  return { ok: true as const, billingAccount: data ? toBillingAccount(data as Record<string, unknown>) : null };
+}
+
+export async function expireManualVendorBillingIfNeeded(companyId: string) {
+  if (!isSupabaseConfigured()) return;
+  const service = serviceClient();
+  if (!service) return;
+
+  const { data } = await service
+    .from("vendor_billing_accounts")
+    .select("status, current_period_end, stripe_subscription_id")
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  if (!data) return;
+  const row = data as Record<string, unknown>;
+  const isManual = !row.stripe_subscription_id;
+  const isActive = row.status === "active";
+  const isExpired = row.current_period_end && new Date(String(row.current_period_end)) < new Date();
+
+  if (isManual && isActive && isExpired) {
+    await service
+      .from("vendor_billing_accounts")
+      .update({ status: "paused", pause_requested_at: new Date().toISOString() })
+      .eq("company_id", companyId);
+    await service.from("vendor_profiles").update({ active: false }).eq("id", companyId);
+  }
 }

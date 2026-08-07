@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getVendorBillingAccount } from "@/lib/server/api-store";
 import { createStripeBillingPortalSession } from "@/lib/server/stripe";
+import { getCurrentVendorSession } from "@/lib/server/vendor-auth";
 
 type Params = { params: Promise<{ companyId: string }> };
 
@@ -11,6 +12,10 @@ function safeOrigin(request: Request) {
 
 export async function POST(request: Request, { params }: Params) {
   const { companyId } = await params;
+  const vendor = await getCurrentVendorSession();
+  if (!vendor) return NextResponse.json({ error: "開発会社ログインが必要です。" }, { status: 401 });
+  if (vendor.companyId !== companyId) return NextResponse.json({ error: "この請求情報にアクセスする権限がありません。" }, { status: 403 });
+
   const billingAccount = await getVendorBillingAccount(companyId);
   if (!billingAccount) {
     return NextResponse.json({ error: "請求アカウントが見つかりません。" }, { status: 404 });

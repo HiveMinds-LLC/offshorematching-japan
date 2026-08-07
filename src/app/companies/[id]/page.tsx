@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { CompanyProfilePageClient } from "./company-profile-page-client";
-import { getAppUserRole, getBuyerByUserId, getCompanyProfile, isSupabaseConfigured, listSavedCompanyIdsByBuyerUserId } from "@/lib/server/api-store";
+import { getAppUserRole, getBuyerByUserId, getCompanyProfile, getVendorCompanyByUserId, isSupabaseConfigured, listSavedCompanyIdsByBuyerUserId } from "@/lib/server/api-store";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function CompanyProfilePage({
@@ -12,13 +12,14 @@ export default async function CompanyProfilePage({
   const { id } = await params;
   const company = await getCompanyProfile(id);
 
-  if (!company || company.active === false) {
+  if (!company) {
     notFound();
   }
 
   let initialSessionRole: "guest" | "buyer" | "vendor" | "admin" = "guest";
   let initialBuyer = null;
   let initialFavoriteCompanyIds: string[] = [];
+  let isOwnerVendor = false;
 
   if (isSupabaseConfigured()) {
     try {
@@ -37,13 +38,21 @@ export default async function CompanyProfilePage({
           }
         } else if (appUser?.accountType === "vendor") {
           initialSessionRole = "vendor";
+          const vendorCompany = await getVendorCompanyByUserId(user.id);
+          isOwnerVendor = vendorCompany?.id === id;
         } else if (appUser?.accountType === "admin") {
           initialSessionRole = "admin";
+          isOwnerVendor = true;
         }
       }
     } catch {
       initialSessionRole = "guest";
     }
+  }
+
+  // Inactive profiles are only visible to the owning vendor and admins.
+  if (company.active === false && !isOwnerVendor) {
+    notFound();
   }
 
   return (
@@ -52,6 +61,7 @@ export default async function CompanyProfilePage({
       initialSessionRole={initialSessionRole}
       initialBuyer={initialBuyer}
       initialFavoriteCompanyIds={initialFavoriteCompanyIds}
+      isPreview={company.active === false}
     />
   );
 }

@@ -12,11 +12,15 @@ type LocaleContextValue = {
 const LocaleContext = createContext<LocaleContextValue | null>(null);
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocale] = useState<SiteLocale>(() => {
-    if (typeof window === "undefined") return "ja";
+  // Always initialize with "ja" so the server render and the client's first
+  // render match. A useEffect then applies the stored preference, which avoids
+  // a React hydration mismatch caused by localStorage reads in the initializer.
+  const [locale, setLocale] = useState<SiteLocale>("ja");
+
+  useEffect(() => {
     const stored = window.localStorage.getItem("offshorematch-locale");
-    return stored === "ja" || stored === "en" ? stored : "ja";
-  });
+    if (stored === "ja" || stored === "en") setLocale(stored);
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem("offshorematch-locale", locale);

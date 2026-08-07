@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useLocale } from "@/components/i18n/locale-provider";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useToast } from "@/components/ui/toaster";
 import { Textarea } from "@/components/ui/textarea";
 import { SEED_PROJECT_HISTORY } from "@/lib/data/mockData";
@@ -1455,7 +1456,7 @@ export function OffshoreMatchApp({
 
   const matchedResults = useMemo<MatchResult[]>(() => {
     if (!criteria) return [];
-    return runTierAwareMatch(companies, criteria, {}, 6);
+    return runTierAwareMatch(companies, criteria, 6);
   }, [companies, criteria]);
 
   const matchingSteps = useMemo(
@@ -3440,12 +3441,6 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
           <div className="mt-4 border-t border-slate-200 pt-4">
             <p className="px-1 text-xs font-semibold tracking-[0.14em] text-slate-500">ADMIN</p>
             <p className="mt-2 px-1 text-xs text-slate-500">{adminEmail}</p>
-            <Link
-              href="/app/admin"
-              className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              {locale === "ja" ? "管理ダッシュボード" : "Admin Dashboard"}
-            </Link>
             {sessionRole === "guest" ? (
               <Button className="mt-3 w-full" variant="ghost" onClick={handleAdminLogout} disabled={adminLogoutLoading}>
                 {adminLogoutLoading ? (locale === "ja" ? "ログアウト中..." : "Signing out...") : (locale === "ja" ? "ログアウト" : "Logout")}
@@ -3612,7 +3607,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                     <Input className="h-11" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} />
                   </Field>
                   <Field label={locale === "ja" ? "パスワード" : "Password"}>
-                    <Input className="h-11" type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} />
+                    <PasswordInput className="h-11" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} />
                   </Field>
                 </div>
                 <div className="flex flex-wrap gap-2">
