@@ -184,7 +184,8 @@ export function AdminReviewPanel({
   }
 
   async function handleRenew(companyId: string) {
-    const accessEndsAt = renewalDates[companyId];
+    const entry = companies.find((e) => e.company.id === companyId);
+    const accessEndsAt = renewalDates[companyId] ?? entry?.currentPeriodEnd?.slice(0, 10);
     if (!accessEndsAt) return;
     setRenewalLoadingId(companyId);
     const response = await readJson<{ billingAccount: unknown }>(`/api/admin/billing/${companyId}`, {
@@ -209,6 +210,13 @@ export function AdminReviewPanel({
         text: locale === "en"
           ? "Fill in all required fields (password must be at least 8 characters)."
           : "すべての必須項目を入力してください（パスワードは8文字以上）。"
+      });
+      return;
+    }
+    if (new Date(accessEndsAt) <= new Date()) {
+      setNewVendorMessage({
+        ok: false,
+        text: locale === "en" ? "Access end date must be in the future." : "利用終了日は未来の日付を設定してください。"
       });
       return;
     }
@@ -305,26 +313,28 @@ export function AdminReviewPanel({
 
   async function handleAdminLogin() {
     setLoginLoading(true);
-    const response = await readJson<{ admin: { email: string } }>("/api/admin/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: adminEmail, password: adminPassword })
-    });
-    if (!response.ok || !response.data) {
-      const errorMessage = response.error ?? (locale === "en" ? "Admin login failed." : "管理者ログインに失敗しました。");
-      setAdminMessage(errorMessage);
-      toast({ tone: "error", title: locale === "en" ? "Admin login failed" : "管理者ログインに失敗しました", description: errorMessage });
-      setLoginLoading(false);
-      return;
-    }
+    try {
+      const response = await readJson<{ admin: { email: string } }>("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: adminEmail, password: adminPassword })
+      });
+      if (!response.ok || !response.data) {
+        const errorMessage = response.error ?? (locale === "en" ? "Admin login failed." : "管理者ログインに失敗しました。");
+        setAdminMessage(errorMessage);
+        toast({ tone: "error", title: locale === "en" ? "Admin login failed" : "管理者ログインに失敗しました", description: errorMessage });
+        return;
+      }
 
-    setAdminLoggedIn(true);
-    setAdminEmail(response.data.admin.email);
-    setAdminPassword("");
-    setAdminMessage("");
-    await refreshAll();
-    toast({ tone: "success", title: locale === "en" ? "Logged in as admin" : "管理者としてログインしました" });
-    setLoginLoading(false);
+      setAdminLoggedIn(true);
+      setAdminEmail(response.data.admin.email);
+      setAdminPassword("");
+      setAdminMessage("");
+      await refreshAll();
+      toast({ tone: "success", title: locale === "en" ? "Logged in as admin" : "管理者としてログインしました" });
+    } finally {
+      setLoginLoading(false);
+    }
   }
 
   async function handleAdminLogout() {
@@ -685,7 +695,7 @@ export function AdminReviewPanel({
                             <Button
                               className="whitespace-nowrap"
                               onClick={() => void handleRenew(entry.company.id)}
-                              disabled={renewalLoadingId === entry.company.id || !renewalDates[entry.company.id]}
+                              disabled={renewalLoadingId === entry.company.id || !(renewalDates[entry.company.id] ?? entry.currentPeriodEnd?.slice(0, 10))}
                             >
                               {renewalLoadingId === entry.company.id
                                 ? (locale === "en" ? "Updating..." : "更新中...")
