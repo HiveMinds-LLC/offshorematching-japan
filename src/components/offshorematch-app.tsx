@@ -652,6 +652,8 @@ export function OffshoreMatchApp({
   const loadedBuyerThreadIdsRef = useRef<Set<string>>(new Set());
   const loadedVendorThreadIdsRef = useRef<Set<string>>(new Set());
   const vendorBillingHydratedRef = useRef(Boolean(initialVendorBilling));
+  const threadsInitializedRef = useRef(false);
+  const vendorThreadsInitializedRef = useRef(false);
 
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -812,13 +814,14 @@ export function OffshoreMatchApp({
   }, [readJson]);
 
   const refreshThreads = useCallback(async function refreshThreads(preferredThreadId?: string) {
-    setThreadsLoading((prev) => prev || threads.length === 0);
+    setThreadsLoading(!threadsInitializedRef.current);
     const response = await readJson<{ threads: BuyerThread[] }>("/api/messages/threads");
     const data = response.data;
     if (!response.ok || !data) {
       setThreadsLoading(false);
       return;
     }
+    threadsInitializedRef.current = true;
     setThreads(data.threads);
     setActiveThreadId((current) => {
       if (preferredThreadId && data.threads.some((thread) => thread.id === preferredThreadId)) {
@@ -832,7 +835,7 @@ export function OffshoreMatchApp({
       return data.threads[0]?.id || "";
     });
     setThreadsLoading(false);
-  }, [initialThreadId, preferredBuyerThreadId, readJson, threads.length]);
+  }, [initialThreadId, preferredBuyerThreadId, readJson]);
 
   const refreshThreadMessages = useCallback(async function refreshThreadMessages(threadId: string, options?: { markRead?: boolean }) {
     if (!threadId) return;
@@ -899,12 +902,13 @@ export function OffshoreMatchApp({
   }, [readJson]);
 
   const refreshVendorThreads = useCallback(async function refreshVendorThreads(preferredThreadId?: string) {
-    setVendorThreadsLoading((prev) => prev || vendorThreads.length === 0);
+    setVendorThreadsLoading(!vendorThreadsInitializedRef.current);
     const response = await readJson<{ threads: BuyerThread[] }>("/api/messages/vendor/threads");
     if (!response.ok || !response.data) {
       setVendorThreadsLoading(false);
       return;
     }
+    vendorThreadsInitializedRef.current = true;
     setVendorThreads(response.data.threads);
     setActiveVendorThreadId((current) => {
       if (preferredThreadId && response.data!.threads.some((thread) => thread.id === preferredThreadId)) {
@@ -917,7 +921,7 @@ export function OffshoreMatchApp({
       return response.data!.threads[0]?.id || "";
     });
     setVendorThreadsLoading(false);
-  }, [preferredVendorThreadId, readJson, vendorThreads.length]);
+  }, [preferredVendorThreadId, readJson]);
 
   const refreshVendorApplication = useCallback(async function refreshVendorApplication() {
     const response = await readJson<{ application: VendorApplication | null; company: Company | null }>("/api/vendors/me/application");
@@ -1166,9 +1170,10 @@ export function OffshoreMatchApp({
       setBuyerThreadOverview([]);
       return;
     }
+    if (sessionHydrating) return;
     if (activeSection !== "buyer-overview" && activeSection !== "buyer-projects") return;
     void buildBuyerThreadOverview(threads);
-  }, [threads, sessionRole, companies, activeSection, buildBuyerThreadOverview]);
+  }, [threads, sessionRole, companies, activeSection, buildBuyerThreadOverview, sessionHydrating]);
 
   useEffect(() => {
     if (activeSection !== "marketplace") return;
@@ -1188,9 +1193,10 @@ export function OffshoreMatchApp({
       setVendorThreadOverview([]);
       return;
     }
+    if (sessionHydrating) return;
     if (activeSection !== "vendor-overview" && activeSection !== "vendor-history") return;
     void buildVendorThreadOverview(vendorThreads, activeVendorCompany.id);
-  }, [vendorThreads, sessionRole, activeVendorCompany, activeSection, buildVendorThreadOverview]);
+  }, [vendorThreads, sessionRole, activeVendorCompany, activeSection, buildVendorThreadOverview, sessionHydrating]);
 
   useEffect(() => {
     if (!supabase || !browserSupabaseReady || sessionRole !== "buyer" || !activeBuyer) return;
