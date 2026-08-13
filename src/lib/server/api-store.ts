@@ -1648,7 +1648,10 @@ export async function getVendorBillingAccount(companyId: string) {
   const billingRow = data as Record<string, unknown>;
   if (!billingRow.stripe_subscription_id && billingRow.status === "active" && billingRow.current_period_end) {
     if (new Date(String(billingRow.current_period_end)) < new Date()) {
-      await client.from("vendor_billing_accounts").update({ status: "paused", pause_requested_at: new Date().toISOString() }).eq("company_id", companyId);
+      // Use the company_id stored in the found row, not the function param — they diverge
+      // when the row was located via the application_id fallback path above.
+      const effectiveCompanyId = billingRow.company_id ? String(billingRow.company_id) : companyId;
+      await client.from("vendor_billing_accounts").update({ status: "paused", pause_requested_at: new Date().toISOString() }).eq("company_id", effectiveCompanyId);
       await client.from("vendor_profiles").update({ active: false }).eq("id", companyId);
       billingRow.status = "paused";
     }
@@ -2815,7 +2818,10 @@ export async function adminCreateBuyerAccount(input: {
     .single();
 
   if (profileError || !profile) {
-    await service.auth.admin.deleteUser(authData.user.id);
+    const { error: deleteError } = await service.auth.admin.deleteUser(authData.user.id);
+    if (deleteError) {
+      console.error(`Failed to clean up auth user ${authData.user.id} after buyer profile insert failure:`, deleteError.message);
+    }
     return { ok: false as const, error: "クライアントプロフィールの作成に失敗しました。" };
   }
 
@@ -2888,7 +2894,7 @@ export async function adminCreateVendorAccount(input: {
 
   const companyId = String(application.id);
 
-  await service.from("vendor_profiles").insert({
+  const { error: profileError } = await service.from("vendor_profiles").insert({
     id: companyId,
     owner_user_id: authData.user.id,
     application_id: companyId,
@@ -2912,7 +2918,13 @@ export async function adminCreateVendorAccount(input: {
     active: true
   });
 
-  await service.from("vendor_billing_accounts").insert({
+  if (profileError) {
+    await service.from("vendor_applications").delete().eq("id", companyId);
+    await service.auth.admin.deleteUser(authData.user.id);
+    return { ok: false as const, error: "開発会社プロフィールの作成に失敗しました。" };
+  }
+
+  const { error: billingError } = await service.from("vendor_billing_accounts").insert({
     company_id: companyId,
     application_id: companyId,
     company_name: input.companyName,
@@ -2925,6 +2937,13 @@ export async function adminCreateVendorAccount(input: {
     terms_accepted_at: now,
     terms_version: "1.0"
   });
+
+  if (billingError) {
+    await service.from("vendor_profiles").delete().eq("id", companyId);
+    await service.from("vendor_applications").delete().eq("id", companyId);
+    await service.auth.admin.deleteUser(authData.user.id);
+    return { ok: false as const, error: "請求情報の作成に失敗しました。" };
+  }
 
   return { ok: true as const, companyId };
 }
@@ -2948,35 +2967,13 @@ export async function adminRenewVendorAccess(companyId: string, accessEndsAt: st
 
   if (billingError) return { ok: false as const, error: "請求情報の更新に失敗しました。" };
 
-  await service.from("vendor_profiles").update({ active: true, ...(plan ? { plan_key: plan } : {}) }).eq("id", companyId);
-  await service.from("vendor_applications").update({ status: "approved", ...(plan ? { plan_key: plan } : {}) }).eq("id", companyId);
+  const { error: profileUpdateError } = await service.from("vendor_profiles").update({ active: true, ...(plan ? { plan_key: plan } : {}) }).eq("id", companyId);
+  if (profileUpdateError) return { ok: false as const, error: "プロフィールの更新に失敗しました。" };
+
+  const { error: appUpdateError } = await service.from("vendor_applications").update({ status: "approved", ...(plan ? { plan_key: plan } : {}) }).eq("id", companyId);
+  if (appUpdateError) return { ok: false as const, error: "申請情報の更新に失敗しました。" };
 
   const { data } = await service.from("vendor_billing_accounts").select("*").eq("company_id", companyId).maybeSingle();
   return { ok: true as const, billingAccount: data ? toBillingAccount(data as Record<string, unknown>) : null };
 }
 
-export async function expireManualVendorBillingIfNeeded(companyId: string) {
-  if (!isSupabaseConfigured()) return;
-  const service = serviceClient();
-  if (!service) return;
-
-  const { data } = await service
-    .from("vendor_billing_accounts")
-    .select("status, current_period_end, stripe_subscription_id")
-    .eq("company_id", companyId)
-    .maybeSingle();
-
-  if (!data) return;
-  const row = data as Record<string, unknown>;
-  const isManual = !row.stripe_subscription_id;
-  const isActive = row.status === "active";
-  const isExpired = row.current_period_end && new Date(String(row.current_period_end)) < new Date();
-
-  if (isManual && isActive && isExpired) {
-    await service
-      .from("vendor_billing_accounts")
-      .update({ status: "paused", pause_requested_at: new Date().toISOString() })
-      .eq("company_id", companyId);
-    await service.from("vendor_profiles").update({ active: false }).eq("id", companyId);
-  }
-}
