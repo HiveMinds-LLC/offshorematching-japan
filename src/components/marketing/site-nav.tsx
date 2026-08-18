@@ -18,7 +18,9 @@ export function SiteNav() {
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-5 py-4 lg:px-8">
         <Link href="/" className="inline-flex items-center gap-2.5 font-[family-name:var(--font-display)] text-base font-extrabold tracking-tight text-slate-950 sm:text-lg">
-          <Image src="/icon.png" alt="" width={26} height={26} className="h-6 w-6 rounded-md" priority />
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-blue-100 bg-white p-1 shadow-sm">
+            <Image src="/icon.png" alt="" width={24} height={24} className="h-full w-full object-contain" priority />
+          </span>
           <span>offshoredevelopment.com</span>
         </Link>
         <nav className="order-3 hidden w-full items-center gap-6 border-t border-slate-100 pt-3 md:order-none md:flex md:w-auto md:border-0 md:pt-0">

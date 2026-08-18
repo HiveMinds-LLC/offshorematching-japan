@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { BriefcaseBusiness, Building2, ChevronDown, ChevronRight, FolderKanban, Languages, MessageSquareMore, Pencil, Sparkles, Star, Trash2, Users, Wallet } from "lucide-react";
@@ -2956,7 +2957,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1600px] px-3 pb-10 pt-6 md:px-4 xl:px-5">
+    <div className="mx-auto w-full max-w-[1680px] px-4 pb-14 pt-5 md:px-6 md:pt-7 xl:px-10">
       {logoutLoading ? (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/35 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[28px] border border-white/60 bg-white p-5 shadow-2xl">
@@ -3321,23 +3322,30 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
           </div>
         </div>
       ) : null}
-      <header className="panel mb-5 overflow-hidden p-0">
-        <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-cyan-600 px-6 py-7 text-white">
-          <p className="inline-flex rounded-full border border-white/30 bg-white/10 px-3 py-1 text-xs font-semibold">offshoredevelopment.com</p>
-          <h1 className="mt-3 font-[family-name:var(--font-display)] text-3xl font-extrabold tracking-tight">{locale === "ja" ? "日本企業とオフショア開発会社を、確実に結ぶ" : "Connect Japanese companies with offshore development vendors"}</h1>
-          <p className="mt-2 max-w-3xl text-sm text-blue-100">{locale === "ja" ? "公開マーケットプレイス、開発会社登録、案件マッチング、企業間メッセージを1つに統合。" : "A single product that combines a public marketplace, vendor listings, project matching, and company-to-company messaging."}</p>
+      <header className="relative mb-7 overflow-hidden rounded-[34px] border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
+        <div className="pointer-events-none absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(37,99,235,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(37,99,235,0.05)_1px,transparent_1px)] [background-size:36px_36px]" />
+        <div className="pointer-events-none absolute -right-32 -top-36 h-96 w-96 rounded-full bg-cyan-300/35 blur-3xl" />
+        <div className="relative bg-gradient-to-br from-white via-blue-50 to-cyan-50 px-6 py-9 text-slate-900 md:px-9 md:py-11">
+          <div className="inline-flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-white/85 p-1.5 shadow-sm">
+              <Image src="/icon.png" alt="" width={30} height={30} className="h-full w-full object-contain" priority />
+            </div>
+            <p className="inline-flex rounded-full border border-blue-200 bg-white/80 px-3 py-1 text-xs font-semibold tracking-[0.08em] text-blue-700">offshoredevelopment.com</p>
+          </div>
+          <h1 className="mt-5 max-w-4xl font-[family-name:var(--font-display)] text-3xl font-extrabold tracking-tight md:text-5xl">{locale === "ja" ? "日本企業とオフショア開発会社を、確実に結ぶ" : "Connect Japanese companies with offshore development vendors"}</h1>
+          <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">{locale === "ja" ? "公開マーケットプレイス、開発会社登録、案件マッチング、企業間メッセージを1つに統合。" : "A single product that combines a public marketplace, vendor listings, project matching, and company-to-company messaging."}</p>
         </div>
-        <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="relative grid gap-px border-t border-slate-200 bg-slate-200 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map((kpi) => {
             const Icon = kpi.icon;
             return (
-              <Card key={kpi.label} className="border-slate-100 bg-slate-50/80 p-3 shadow-none">
+              <div key={kpi.label} className="bg-white/90 p-5 transition hover:bg-blue-50/70">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold text-slate-500">{kpi.label}</p>
-                  <Icon className="h-4 w-4 text-slate-400" />
+                  <Icon className="h-4 w-4 text-cyan-600" />
                 </div>
                 <p className="mt-2 font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">{kpi.value}</p>
-              </Card>
+              </div>
             );
           })}
         </div>
@@ -3408,17 +3416,17 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
         </div>
       ) : null}
 
-      <div className="grid gap-5 lg:grid-cols-[220px,1fr] xl:gap-6">
-      <aside className="panel sticky top-3 h-fit border-slate-300 bg-white/95 p-3">
+      <div className="grid gap-6 lg:grid-cols-[248px,1fr] xl:gap-9">
+      <aside className="sticky top-5 h-fit overflow-hidden rounded-[28px] border border-slate-200 bg-white/95 p-3 shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
         <nav className="grid gap-2">
           {visibleSections.map((item) => (
             <button
               key={item.key}
               type="button"
               onClick={() => setActiveSection(item.key)}
-                className={`min-h-12 rounded-xl border px-4 py-3 text-left text-sm font-bold transition ${
+                className={`min-h-12 rounded-xl border px-4 py-3 text-left text-sm font-bold transition duration-200 ${
                 activeSection === item.key
-                  ? "border-blue-500 bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-sm"
+                  ? "border-blue-500 bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-[0_8px_20px_rgba(8,145,178,0.24)]"
                   : isPrimaryActionSection(item.key)
                     ? "border-emerald-200 bg-gradient-to-r from-emerald-50 to-cyan-50 text-emerald-900 shadow-sm hover:border-emerald-300"
                   : "border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50"
@@ -3484,7 +3492,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}
           transition={{ duration: 0.22, ease: "easeOut" }}
-          className="grid gap-4"
+          className="grid gap-5"
         >
           {activeSection === "marketplace" ? (
             <>
