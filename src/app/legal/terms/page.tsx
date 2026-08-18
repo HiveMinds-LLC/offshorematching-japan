@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { LegalPageShell } from "@/components/legal/legal-page-shell";
-import { LEGAL_PLACEHOLDERS, TERMS_VERSION } from "@/lib/legal";
+import { LEGAL_BUSINESS_INFO, TERMS_VERSION } from "@/lib/legal";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -18,10 +18,10 @@ export default function TermsPage() {
     <LegalPageShell
       eyebrow="TERMS OF SERVICE"
       title="利用規約"
-      subtitle={`本規約は OffshoreMatch の利用条件を定める基本ドラフトです。公開前に、${LEGAL_PLACEHOLDERS.companyName} の実在情報へ差し替えたうえで弁護士確認を行ってください。版: ${TERMS_VERSION}`}
+      subtitle={`本規約は OffshoreMatch の利用条件を定めます。版: ${TERMS_VERSION}`}
     >
       <Section title="1. 適用範囲">
-        <p>本規約は、{LEGAL_PLACEHOLDERS.companyName}（以下「当社」）が提供する OffshoreMatch および関連サービスの利用に適用されます。</p>
+        <p>本規約は、{LEGAL_BUSINESS_INFO.companyName}（以下「当社」）が提供する OffshoreMatch および関連サービスの利用に適用されます。</p>
         <p>発注企業、開発会社、その他本サービスへアクセスする全ての利用者は、本規約に同意のうえで利用するものとします。</p>
       </Section>
 
@@ -37,7 +37,7 @@ export default function TermsPage() {
 
       <Section title="4. 開発会社掲載と料金">
         <p>開発会社による掲載は、所定の月額料金の支払完了と必須プロフィール項目の入力完了を条件として有効化されます。</p>
-        <p>標準掲載料金は月額5,000円（税込表示の要否は実運用に応じて確定）です。詳細な販売条件は <Link href="/legal/commercial-transactions" className="font-semibold text-blue-700 underline underline-offset-2">特定商取引法に基づく表記</Link> に定めます。</p>
+        <p>ベーシックプランは月額5,000円、翻訳付きプランは月額10,000円です。詳細な販売条件は <Link href="/legal/commercial-transactions" className="font-semibold text-blue-700 underline underline-offset-2">特定商取引法に基づく表記</Link> に定めます。</p>
       </Section>
 
       <Section title="5. 禁止事項">

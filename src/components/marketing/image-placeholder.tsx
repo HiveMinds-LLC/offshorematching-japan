@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 type ImagePlaceholderProps = {
   label: string;
   hint?: string;
+  showMeta?: boolean;
 };
 
 type PreviewVariant =
@@ -289,7 +290,7 @@ function BillingPreview() {
   );
 }
 
-export function ImagePlaceholder({ label, hint }: ImagePlaceholderProps) {
+export function ImagePlaceholder({ label, hint, showMeta = true }: ImagePlaceholderProps) {
   const variant = resolveVariant(label);
 
   return (
@@ -303,10 +304,10 @@ export function ImagePlaceholder({ label, hint }: ImagePlaceholderProps) {
         {variant === "matching" ? <MatchingPreview /> : null}
         {variant === "billing" ? <BillingPreview /> : null}
       </div>
-      <div className="mt-4">
+      {showMeta ? <div className="mt-4">
         <p className="text-sm font-semibold text-slate-800">{label}</p>
         {hint ? <p className="mt-1 text-xs leading-6 text-slate-500">{hint}</p> : null}
-      </div>
+      </div> : null}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { LegalPageShell } from "@/components/legal/legal-page-shell";
-import { LEGAL_PLACEHOLDERS, TERMS_VERSION } from "@/lib/legal";
+import { LEGAL_BUSINESS_INFO, TERMS_VERSION } from "@/lib/legal";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -17,7 +17,7 @@ export default function PrivacyPage() {
     <LegalPageShell
       eyebrow="PRIVACY POLICY"
       title="プライバシーポリシー"
-      subtitle={`本ポリシーは APPI を意識した基本ドラフトです。${LEGAL_PLACEHOLDERS.companyName} の実際の運用、委託先、保存期間、問い合わせ窓口へ合わせて最終調整してください。版: ${TERMS_VERSION}`}
+      subtitle={`${LEGAL_BUSINESS_INFO.companyName} は、利用者情報を適切に取り扱うため、以下のとおりプライバシーポリシーを定めます。版: ${TERMS_VERSION}`}
     >
       <Section title="1. 取得する情報">
         <p>当社は、アカウント情報、会社情報、担当者情報、公開プロフィール情報、請求関連情報、問い合わせ履歴、メッセージ内容、アクセスログ、端末情報等を取得する場合があります。</p>
@@ -50,10 +50,9 @@ export default function PrivacyPage() {
       </Section>
 
       <Section title="8. お問い合わせ窓口">
-        <p>事業者名: {LEGAL_PLACEHOLDERS.companyName}</p>
-        <p>担当: {LEGAL_PLACEHOLDERS.representativeName}</p>
-        <p>メール: {LEGAL_PLACEHOLDERS.supportEmail}</p>
-        <p>電話: {LEGAL_PLACEHOLDERS.supportPhone}</p>
+        <p>事業者名: {LEGAL_BUSINESS_INFO.companyName}</p>
+        <p>担当: {LEGAL_BUSINESS_INFO.representativeName}</p>
+        <p>メール: {LEGAL_BUSINESS_INFO.supportEmail}</p>
       </Section>
     </LegalPageShell>
   );

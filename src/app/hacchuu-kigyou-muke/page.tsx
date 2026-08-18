@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 
 import { useLocale } from "@/components/i18n/locale-provider";
-import { ImagePlaceholder } from "@/components/marketing/image-placeholder";
 import { SectionReveal } from "@/components/marketing/section-reveal";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { SiteNav } from "@/components/marketing/site-nav";
@@ -36,7 +36,7 @@ export default function BuyerMarketPage() {
     <div>
       <SiteNav />
       <main>
-        <section className="px-4 pb-20 pt-14">
+        <section className="bg-slate-50 px-6 pb-24 pt-20 md:px-10">
           <div className="mx-auto grid w-full max-w-7xl gap-10 lg:grid-cols-[1.05fr,0.95fr] lg:items-center">
             <div>
               <p className="inline-flex rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-semibold text-blue-700">FOR BUYERS</p>
@@ -59,13 +59,13 @@ export default function BuyerMarketPage() {
                 {locale === "ja" ? "候補探索から要件整理、初回問い合わせまで。調達チームが必要とする初期検討プロセスを一つの流れで支えます。" : "From discovery to requirements clarification and first contact, this flow supports the early-stage evaluation work procurement teams actually need."}
               </p>
             </div>
-            <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl">
-              <ImagePlaceholder label={locale === "ja" ? "発注企業向けUI" : "Buyer UI"} hint={locale === "ja" ? "例: 要件入力・候補比較・メッセージ画面" : "Example: requirement input, vendor comparison, and messaging"} />
+            <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.10)]">
+              <Image src="/marketing/marketplace.png" alt={locale === "ja" ? "開発会社を比較するマーケットプレイス" : "Vendor marketplace"} width={1265} height={713} priority className="block h-auto w-full" />
             </div>
           </div>
         </section>
 
-        <SectionReveal className="px-4 pb-20">
+        <SectionReveal className="px-6 pb-20 pt-16 md:px-10 md:pt-20">
           <div className="mx-auto grid w-full max-w-7xl gap-4 md:grid-cols-3">
             {benefits.map((item) => (
               <article key={item} className="panel p-8">
@@ -76,7 +76,7 @@ export default function BuyerMarketPage() {
           </div>
         </SectionReveal>
 
-        <SectionReveal className="px-4 pb-24">
+        <SectionReveal className="px-6 pb-24 pt-16 md:px-10 md:pt-20">
           <div className="mx-auto w-full max-w-7xl rounded-[28px] border border-slate-200 bg-white p-10">
             <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold text-slate-900 sm:text-4xl">{locale === "ja" ? "導入フロー" : "Flow"}</h2>
             <div className="mt-7 grid gap-4 md:grid-cols-3">
