@@ -6,7 +6,10 @@ export default function AppLoading() {
       <AppTopbar title="アプリ" titleEn="App" subtitle="読み込み中" subtitleEn="Loading" />
       <main className="mx-auto flex min-h-[60vh] w-full max-w-7xl items-center justify-center px-4 py-12">
         <div className="grid justify-items-center gap-4">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />
+          <div
+            className="app-loading-spinner h-10 w-10 rounded-full border-2 border-slate-200 border-t-slate-900"
+            style={{ animation: "app-spinner-spin 0.8s linear infinite" }}
+          />
           <p className="text-sm font-medium text-slate-600">読み込み中 / Loading</p>
         </div>
       </main>
