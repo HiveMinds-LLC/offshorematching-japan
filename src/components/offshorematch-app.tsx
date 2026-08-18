@@ -319,7 +319,10 @@ function counterpartyDisplay(companyName?: string, contactName?: string) {
 function InlineLoadingState({ label }: { label: string }) {
   return (
     <div className="flex min-h-[120px] items-center justify-center gap-3 text-sm text-slate-500">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
+      <span
+        className="app-loading-spinner h-4 w-4 rounded-full border-2 border-slate-300 border-t-slate-700"
+        style={{ animation: "app-spinner-spin 0.8s linear infinite" }}
+      />
       <span>{label}</span>
     </div>
   );
