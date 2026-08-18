@@ -3322,7 +3322,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
           </div>
         </div>
       ) : null}
-      <header className="relative mb-7 overflow-hidden rounded-[34px] border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
+      <header data-app-workspace-hero className="relative mb-7 overflow-hidden rounded-[34px] border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
         <div className="pointer-events-none absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(37,99,235,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(37,99,235,0.05)_1px,transparent_1px)] [background-size:36px_36px]" />
         <div className="pointer-events-none absolute -right-32 -top-36 h-96 w-96 rounded-full bg-cyan-300/35 blur-3xl" />
         <div className="relative bg-gradient-to-br from-white via-blue-50 to-cyan-50 px-6 py-9 text-slate-900 md:px-9 md:py-11">
@@ -3339,7 +3339,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
           {kpis.map((kpi) => {
             const Icon = kpi.icon;
             return (
-              <div key={kpi.label} className="bg-white/90 p-5 transition hover:bg-blue-50/70">
+              <div key={kpi.label} className="app-kpi-card relative overflow-hidden bg-white/90 p-5 transition">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold text-slate-500">{kpi.label}</p>
                   <Icon className="h-4 w-4 text-cyan-600" />
@@ -3417,14 +3417,14 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[248px,1fr] xl:gap-9">
-      <aside className="sticky top-5 h-fit overflow-hidden rounded-[28px] border border-slate-200 bg-white/95 p-3 shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
+      <aside data-app-sidebar className="sticky top-5 h-fit overflow-hidden rounded-[28px] border border-slate-200 bg-white/95 p-3 shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
         <nav className="grid gap-2">
           {visibleSections.map((item) => (
             <button
               key={item.key}
               type="button"
               onClick={() => setActiveSection(item.key)}
-                className={`min-h-12 rounded-xl border px-4 py-3 text-left text-sm font-bold transition duration-200 ${
+                className={`app-nav-item ${isPrimaryActionSection(item.key) ? "app-primary-nav-item" : ""} min-h-12 rounded-xl border px-4 py-3 text-left text-sm font-bold transition duration-200 ${
                 activeSection === item.key
                   ? "border-blue-500 bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-[0_8px_20px_rgba(8,145,178,0.24)]"
                   : isPrimaryActionSection(item.key)
@@ -3699,7 +3699,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                       </div>
                     </Card>
 
-                    <Card className="grid gap-3 border-slate-100 bg-gradient-to-br from-white via-slate-50 to-cyan-50 p-5 shadow-none">
+                    <Card className="recent-chat-card grid gap-3 border-slate-100 bg-gradient-to-br from-white via-slate-50 to-cyan-50 p-5 shadow-none">
                       <div className="flex items-center gap-2 text-slate-900">
                         <div className="rounded-xl bg-cyan-100 p-2 text-cyan-700">
                           <MessageSquareMore className="h-4 w-4" />
@@ -3708,7 +3708,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                       </div>
                       <div className="grid gap-2">
                         {buyerThreadOverview.slice(0, 3).map((thread) => (
-                          <div key={thread.threadId} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                          <div key={thread.threadId} className="recent-chat-row rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                             <div className="flex items-center justify-between gap-3">
                               <p className="text-sm font-semibold text-slate-900">{thread.counterpartyLabel}</p>
                               <div className="flex items-center gap-2">
@@ -4229,7 +4229,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                     </div>
                   </Card>
 
-                  <Card className="grid gap-3 border-slate-100 bg-gradient-to-br from-white via-slate-50 to-cyan-50 p-5 shadow-none">
+                  <Card className="recent-chat-card grid gap-3 border-slate-100 bg-gradient-to-br from-white via-slate-50 to-cyan-50 p-5 shadow-none">
                     <div className="flex items-center gap-2 text-slate-900">
                       <div className="rounded-xl bg-cyan-100 p-2 text-cyan-700">
                         <MessageSquareMore className="h-4 w-4" />
@@ -4238,7 +4238,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                     </div>
                     <div className="grid gap-2">
                       {vendorThreadOverview.slice(0, 3).map((thread) => (
-                        <div key={thread.threadId} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                        <div key={thread.threadId} className="recent-chat-row rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                           <div className="flex items-center justify-between gap-3">
                             <p className="text-sm font-semibold text-slate-900">{thread.counterpartyLabel}</p>
                             <div className="flex items-center gap-2">
