@@ -1,5 +1,5 @@
 import { LegalPageShell } from "@/components/legal/legal-page-shell";
-import { LEGAL_PLACEHOLDERS, TERMS_VERSION } from "@/lib/legal";
+import { LEGAL_BUSINESS_INFO, TERMS_VERSION } from "@/lib/legal";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -15,15 +15,14 @@ export default function CommercialTransactionsPage() {
     <LegalPageShell
       eyebrow="COMMERCIAL DISCLOSURE"
       title="特定商取引法に基づく表記"
-      subtitle={`月額課金型の掲載サービスに関する基本ドラフトです。販売事業者情報、税込表示、返金条件、決済手段は公開前に必ず実態へ合わせて修正してください。版: ${TERMS_VERSION}`}
+      subtitle={`月額課金型の掲載サービスに関する表記です。価格はすべて税込です。版: ${TERMS_VERSION}`}
     >
       <div className="grid gap-3 md:grid-cols-2">
-        <Row label="販売事業者" value={LEGAL_PLACEHOLDERS.companyName} />
-        <Row label="代表責任者" value={LEGAL_PLACEHOLDERS.representativeName} />
-        <Row label="所在地" value={LEGAL_PLACEHOLDERS.address} />
-        <Row label="電話番号" value={LEGAL_PLACEHOLDERS.supportPhone} />
-        <Row label="メールアドレス" value={LEGAL_PLACEHOLDERS.supportEmail} />
-        <Row label="販売価格" value="開発会社掲載料 月額 5,000円" />
+        <Row label="販売事業者" value={LEGAL_BUSINESS_INFO.companyName} />
+        <Row label="代表責任者" value={LEGAL_BUSINESS_INFO.representativeName} />
+        <Row label="所在地・電話番号" value="請求があった場合には、遅滞なく電子メールにより提供します。" />
+        <Row label="メールアドレス" value={LEGAL_BUSINESS_INFO.supportEmail} />
+        <Row label="販売価格" value="開発会社掲載料：ベーシックプラン 月額5,000円／翻訳付きプラン 月額10,000円" />
         <Row label="商品代金以外の必要料金" value="インターネット接続料金、通信料金、振込手数料等は利用者負担" />
         <Row label="支払方法" value="クレジットカード決済" />
         <Row label="支払時期" value="初回は申込時、以後は1か月ごとの自動更新時" />

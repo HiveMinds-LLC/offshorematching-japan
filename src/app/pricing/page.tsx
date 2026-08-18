@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 
 import { useLocale } from "@/components/i18n/locale-provider";
-import { ImagePlaceholder } from "@/components/marketing/image-placeholder";
 import { SectionReveal } from "@/components/marketing/section-reveal";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { SiteNav } from "@/components/marketing/site-nav";
@@ -14,16 +14,16 @@ export default function PricingPage() {
     <div>
       <SiteNav />
       <main>
-        <section className="px-4 pb-20 pt-14">
+        <section className="bg-slate-50 px-6 pb-24 pt-20 md:px-10">
           <div className="mx-auto grid w-full max-w-7xl gap-10 lg:grid-cols-[1.05fr,0.95fr] lg:items-center">
             <div>
               <p className="inline-flex rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-semibold text-blue-700">PRICING</p>
               <h1 className="mt-5 font-[family-name:var(--font-display)] text-4xl font-extrabold leading-[1.1] text-slate-900 sm:text-5xl">
                 {locale === "ja" ? (
                   <>
-                    料金はシンプル、
+                    シンプルな料金体系で、
                     <br />
-                    導入はすぐ始められる。
+                    今すぐ使えます。
                   </>
                 ) : (
                   <>
@@ -35,17 +35,17 @@ export default function PricingPage() {
               </h1>
               <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
                 {locale === "ja"
-                  ? "開発会社は月額5,000円のスタンダード掲載、または月額10,000円の翻訳付き掲載を選択できます。発注企業は無料で候補探索、案件マッチング、メッセージ機能を利用できます。"
+                  ? "開発企業は月額5,000円から掲載可能です。上位プランでは自動翻訳システムが追加され、国外のオフショア先とも普段のメッセージと同じ感覚で業務連絡ができます。発注企業は基本料金無料で、サービス検討に必要な情報を閲覧し、システム内でシームレスにやり取りできます。"
                   : "Vendors can choose a standard listing at JPY 5,000 per month or a translation-enabled listing at JPY 10,000 per month. Buyers can browse, use project matching, and message for free."}
               </p>
             </div>
-            <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl">
-              <ImagePlaceholder label={locale === "ja" ? "料金ページビジュアル" : "Pricing Visual"} hint={locale === "ja" ? "例: 料金カード + 登録から掲載開始までの導線図" : "Example: pricing cards + signup-to-listing flow"} />
+            <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.10)]">
+              <Image src="/marketing/vendor-onboarding.png" alt={locale === "ja" ? "開発会社の登録とプラン選択" : "Vendor registration and plan selection"} width={1265} height={713} priority className="block h-auto w-full" />
             </div>
           </div>
         </section>
 
-        <SectionReveal className="px-4 pb-20">
+        <SectionReveal className="px-6 pb-20 pt-16 md:px-10 md:pt-20">
           <div className="mx-auto grid w-full max-w-7xl gap-5 md:grid-cols-3">
             <article className="panel border-blue-100 bg-blue-50 p-9">
               <p className="text-xs font-semibold tracking-wide text-blue-700">{locale === "ja" ? "開発会社向け" : "For Vendors"}</p>
@@ -84,7 +84,7 @@ export default function PricingPage() {
           </div>
         </SectionReveal>
 
-        <SectionReveal className="px-4 pb-24">
+        <SectionReveal className="px-6 pb-24 pt-16 md:px-10 md:pt-20">
           <div className="mx-auto w-full max-w-7xl rounded-[28px] bg-slate-900 px-8 py-12 text-white">
             <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold sm:text-4xl">{locale === "ja" ? "導入フロー" : "Onboarding Flow"}</h2>
             <div className="mt-7 grid gap-4 md:grid-cols-3">
