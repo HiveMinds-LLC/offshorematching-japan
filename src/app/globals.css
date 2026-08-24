@@ -124,6 +124,14 @@ body.app-theme-dark .text-slate-600 { color: #b8c7da; }
 body.app-theme-dark .text-slate-500 { color: #9aabc0; }
 body.app-theme-dark .text-slate-400 { color: #7f93ab; }
 
+/* Light hover utility classes need explicit dark counterparts; otherwise they flash white. */
+body.app-theme-dark .hover\:bg-white:hover { background-color: #1a2a42; }
+body.app-theme-dark .hover\:bg-slate-50:hover { background-color: #1a2a42; }
+body.app-theme-dark .hover\:bg-slate-100:hover { background-color: #223550; }
+body.app-theme-dark .hover\:bg-blue-50:hover { background-color: #172f52; }
+body.app-theme-dark .hover\:bg-blue-100:hover { background-color: #1d3d6d; }
+body.app-theme-dark .hover\:text-slate-900:hover { color: #ffffff; }
+
 body.app-theme-dark .bg-blue-50 { background-color: #172b4d; }
 body.app-theme-dark .bg-blue-100 { background-color: #1d3b68; }
 body.app-theme-dark .border-blue-100,
