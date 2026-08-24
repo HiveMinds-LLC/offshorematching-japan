@@ -48,7 +48,7 @@ export function ToasterProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="pointer-events-none fixed bottom-4 right-4 z-[100] grid w-[min(92vw,360px)] gap-2">
         {items.map((item) => (
-          <div key={item.id} className={`pointer-events-auto rounded-2xl border px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.14)] ${toneClasses(item.tone)}`}>
+          <div data-toast data-toast-tone={item.tone} key={item.id} className={`pointer-events-auto rounded-2xl border px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.14)] ${toneClasses(item.tone)}`}>
             <p className="text-sm font-semibold">{item.title}</p>
             {item.description ? <p className="mt-1 text-sm leading-6 opacity-90">{item.description}</p> : null}
           </div>
