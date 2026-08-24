@@ -127,7 +127,7 @@ export function MarketingHome() {
                 )}
               </h1>
               <p className="mt-6 max-w-xl text-base leading-8 text-slate-600 md:text-lg">
-                {locale === "ja" ? "offshoredevelopment.com は、オフショア開発を検討する日本企業へ、開発会社のディレクトリ情報、案件マッチング、企業間メッセージなど、比較と選定に必要な情報を届けるシステムサービスです。" : "offshoredevelopment.com is a Japan-focused platform for vendor discovery, project matching, company-to-company messaging, and vendor listing operations."}
+                {locale === "ja" ? "offshorekaihatsu.com は、オフショア開発を検討する日本企業へ、開発会社のディレクトリ情報、案件マッチング、企業間メッセージなど、比較と選定に必要な情報を届けるシステムサービスです。" : "offshorekaihatsu.com is a Japan-focused platform for vendor discovery, project matching, company-to-company messaging, and vendor listing operations."}
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link href="/app" className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800">

@@ -399,7 +399,7 @@ export function AdminReviewPanel({
         <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 px-6 py-7 text-white">
           <p className="text-xs font-semibold tracking-wide text-slate-200">ADMIN</p>
           <h1 className="mt-2 font-[family-name:var(--font-display)] text-3xl font-extrabold">
-            {locale === "en" ? "OffshoreDevelopment Admin Dashboard" : "OffshoreDevelopment 運営ダッシュボード"}
+            {locale === "en" ? "OffshoreKaihatsu Admin Dashboard" : "OffshoreKaihatsu 運営ダッシュボード"}
           </h1>
           <p className="mt-2 text-sm text-slate-200">
             {locale === "en"

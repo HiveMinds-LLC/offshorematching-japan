@@ -3333,7 +3333,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-white/85 p-1.5 shadow-sm">
               <Image src="/icon.png" alt="" width={30} height={30} className="h-full w-full object-contain" priority />
             </div>
-            <p className="inline-flex rounded-full border border-blue-200 bg-white/80 px-3 py-1 text-xs font-semibold tracking-[0.08em] text-blue-700">offshoredevelopment.com</p>
+            <p className="inline-flex rounded-full border border-blue-200 bg-white/80 px-3 py-1 text-xs font-semibold tracking-[0.08em] text-blue-700">offshorekaihatsu.com</p>
           </div>
           <h1 className="mt-5 max-w-4xl font-[family-name:var(--font-display)] text-3xl font-extrabold tracking-tight md:text-5xl">{locale === "ja" ? "日本企業とオフショア開発会社を、確実に結ぶ" : "Connect Japanese companies with offshore development vendors"}</h1>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">{locale === "ja" ? "公開マーケットプレイス、開発会社登録、案件マッチング、企業間メッセージを1つに統合。" : "A single product that combines a public marketplace, vendor listings, project matching, and company-to-company messaging."}</p>
