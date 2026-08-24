@@ -26,7 +26,7 @@ export function AppTopbar({ title, titleEn, subtitle, subtitleEn }: AppTopbarPro
   const resolvedSubtitle = locale === "ja" ? subtitle : (subtitleEn ?? subtitle);
 
   useEffect(() => {
-    const savedTheme = window.localStorage.getItem("offshoredevelopment.app-theme");
+    const savedTheme = window.localStorage.getItem("offshorekaihatsu.app-theme") ?? window.localStorage.getItem("offshoredevelopment.app-theme");
     const nextTheme = savedTheme === "dark" || savedTheme === "light"
       ? savedTheme
       : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -37,7 +37,7 @@ export function AppTopbar({ title, titleEn, subtitle, subtitleEn }: AppTopbarPro
   function toggleTheme() {
     const nextTheme = theme === "dark" ? "light" : "dark";
     setTheme(nextTheme);
-    window.localStorage.setItem("offshoredevelopment.app-theme", nextTheme);
+    window.localStorage.setItem("offshorekaihatsu.app-theme", nextTheme);
     document.body.classList.toggle("app-theme-dark", nextTheme === "dark");
   }
 
@@ -49,7 +49,7 @@ export function AppTopbar({ title, titleEn, subtitle, subtitleEn }: AppTopbarPro
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-blue-100 bg-white p-1 shadow-sm">
               <Image src="/icon.png" alt="" width={24} height={24} className="h-full w-full object-contain" priority />
             </span>
-            <span>offshoredevelopment.com</span>
+            <span>offshorekaihatsu.com</span>
           </Link>
           <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-600 sm:text-[11px]">
             {resolvedTitle}

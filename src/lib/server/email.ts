@@ -23,11 +23,11 @@ function sendGridFromEmail() {
 }
 
 function sendGridFromName() {
-  return process.env.SENDGRID_FROM_NAME || "OffshoreDevelopment.com";
+  return process.env.SENDGRID_FROM_NAME || "OffshoreKaihatsu.com";
 }
 
 function appBaseUrl() {
-  return process.env.NEXT_PUBLIC_APP_URL || "https://offshoredevelopment.com";
+  return process.env.NEXT_PUBLIC_APP_URL || "https://offshorekaihatsu.com";
 }
 
 function escapeHtml(value: string) {
@@ -124,20 +124,20 @@ export async function sendVendorNewChatEmail(input: VendorNewChatEmailInput) {
   const safeInboxUrl = escapeHtml(inboxUrl);
   const subject = `New project inquiry from ${input.buyerCompanyName}`;
   const text = [
-    `You received a new project inquiry on OffshoreDevelopment.com.`,
+    `You received a new project inquiry on OffshoreKaihatsu.com.`,
     `Buyer: ${input.buyerCompanyName}`,
     `Company: ${input.vendorCompanyName || "Vendor"}`,
     "",
     "Open your vendor inbox to review the conversation:",
     inboxUrl,
     "",
-    "You are receiving this email because your company account is active on OffshoreDevelopment.com."
+    "You are receiving this email because your company account is active on OffshoreKaihatsu.com."
   ].join("\n");
   const html = [
     `<div style="font-family:Arial,sans-serif;background:#f8fafc;margin:0;padding:24px;color:#0f172a;">`,
     `<div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">`,
     `<div style="padding:20px 24px;background:#1d4ed8 !important;color:#ffffff !important;border-bottom:1px solid #1e40af;">`,
-    `<p style="margin:0 0 8px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#dbeafe !important;-webkit-text-fill-color:#dbeafe;">OffshoreDevelopment.com</p>`,
+    `<p style="margin:0 0 8px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#dbeafe !important;-webkit-text-fill-color:#dbeafe;">OffshoreKaihatsu.com</p>`,
     `<h1 style="margin:0;font-size:22px;line-height:1.3;color:#ffffff !important;-webkit-text-fill-color:#ffffff;">New project inquiry</h1>`,
     `</div>`,
     `<div style="padding:24px;">`,
@@ -147,7 +147,7 @@ export async function sendVendorNewChatEmail(input: VendorNewChatEmailInput) {
     `</div>`,
     `<p style="margin:0 0 20px;font-size:14px;line-height:1.7;color:#475569;">Open your vendor inbox to review the conversation and reply.</p>`,
     `<p style="margin:0 0 24px;"><a href="${safeInboxUrl}" style="display:inline-block;padding:12px 18px;border-radius:999px;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:700;">Open Vendor Inbox</a></p>`,
-    `<p style="margin:0;font-size:12px;line-height:1.7;color:#64748b;">You are receiving this email because your company account is active on OffshoreDevelopment.com.</p>`,
+    `<p style="margin:0;font-size:12px;line-height:1.7;color:#64748b;">You are receiving this email because your company account is active on OffshoreKaihatsu.com.</p>`,
     `</div>`,
     `</div>`,
     `</div>`

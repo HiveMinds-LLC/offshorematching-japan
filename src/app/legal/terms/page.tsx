@@ -18,10 +18,10 @@ export default function TermsPage() {
     <LegalPageShell
       eyebrow="TERMS OF SERVICE"
       title="利用規約"
-      subtitle={`本規約は OffshoreMatch の利用条件を定めます。版: ${TERMS_VERSION}`}
+      subtitle={`本規約は offshorekaihatsu.com の利用条件を定めます。版: ${TERMS_VERSION}`}
     >
       <Section title="1. 適用範囲">
-        <p>本規約は、{LEGAL_BUSINESS_INFO.companyName}（以下「当社」）が提供する OffshoreMatch および関連サービスの利用に適用されます。</p>
+        <p>本規約は、{LEGAL_BUSINESS_INFO.companyName}（以下「当社」）が提供する offshorekaihatsu.com および関連サービスの利用に適用されます。</p>
         <p>発注企業、開発会社、その他本サービスへアクセスする全ての利用者は、本規約に同意のうえで利用するものとします。</p>
       </Section>
 

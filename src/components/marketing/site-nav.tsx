@@ -20,7 +20,7 @@ export function SiteNav() {
       return;
     }
 
-    const savedTheme = window.localStorage.getItem("offshoredevelopment.app-theme");
+    const savedTheme = window.localStorage.getItem("offshorekaihatsu.app-theme") ?? window.localStorage.getItem("offshoredevelopment.app-theme");
     const nextTheme = savedTheme === "dark" || savedTheme === "light"
       ? savedTheme
       : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -31,7 +31,7 @@ export function SiteNav() {
   function toggleTheme() {
     const nextTheme = theme === "dark" ? "light" : "dark";
     setTheme(nextTheme);
-    window.localStorage.setItem("offshoredevelopment.app-theme", nextTheme);
+    window.localStorage.setItem("offshorekaihatsu.app-theme", nextTheme);
     document.body.classList.toggle("app-theme-dark", nextTheme === "dark");
   }
   const navItems = [
@@ -48,7 +48,7 @@ export function SiteNav() {
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-blue-100 bg-white p-1 shadow-sm">
             <Image src="/icon.png" alt="" width={24} height={24} className="h-full w-full object-contain" priority />
           </span>
-          <span>offshoredevelopment.com</span>
+          <span>offshorekaihatsu.com</span>
         </Link>
         <nav className="order-3 hidden w-full items-center gap-6 border-t border-slate-100 pt-3 md:order-none md:flex md:w-auto md:border-0 md:pt-0">
           {navItems.map((item) => (
