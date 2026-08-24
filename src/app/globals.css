@@ -106,6 +106,10 @@ body.app-theme-dark [data-site-nav] .hover\:text-blue-700:hover { color: #93c5fd
 
 body.app-theme-dark .panel,
 body.app-theme-dark .bg-white { background-color: #111c2e; }
+body.app-theme-dark .bg-white\/80,
+body.app-theme-dark .bg-white\/85,
+body.app-theme-dark .bg-white\/90,
+body.app-theme-dark .bg-white\/95 { background-color: #111c2e; }
 body.app-theme-dark .bg-slate-50 { background-color: #162237; }
 body.app-theme-dark .bg-slate-100 { background-color: #202f46; }
 body.app-theme-dark .bg-slate-900 { background-color: #020617; }
@@ -155,6 +159,8 @@ body.app-theme-dark .bg-rose-100 { background-color: #622038; }
 body.app-theme-dark .border-rose-100,
 body.app-theme-dark .border-rose-200 { border-color: #883250; }
 body.app-theme-dark .text-rose-700 { color: #fda4af; }
+body.app-theme-dark .text-rose-950 { color: #ffe4e6; }
+body.app-theme-dark .text-emerald-950 { color: #dcfce7; }
 
 body.app-theme-dark input,
 body.app-theme-dark textarea,
@@ -172,6 +178,25 @@ body.app-theme-dark .from-white { --tw-gradient-from: #111c2e var(--tw-gradient-
 body.app-theme-dark .via-blue-50 { --tw-gradient-via: #1a365d var(--tw-gradient-via-position); }
 body.app-theme-dark .via-slate-50 { --tw-gradient-via: #162237 var(--tw-gradient-via-position); }
 body.app-theme-dark .to-cyan-50 { --tw-gradient-to: #123344 var(--tw-gradient-to-position); }
+
+body.app-theme-dark [data-toast] {
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+}
+body.app-theme-dark [data-toast][data-toast-tone="error"] {
+  border-color: #9f3d5b;
+  background-color: #4c1d2c;
+  color: #ffe4e6;
+}
+body.app-theme-dark [data-toast][data-toast-tone="success"] {
+  border-color: #27815f;
+  background-color: #113b32;
+  color: #dcfce7;
+}
+body.app-theme-dark [data-toast][data-toast-tone="info"] {
+  border-color: #365277;
+  background-color: #111f35;
+  color: #e2e8f0;
+}
 
 body.app-theme-dark [data-app-workspace-hero] {
   border-color: #334c70;
