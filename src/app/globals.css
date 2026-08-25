@@ -261,6 +261,39 @@ body.app-theme-dark .recent-chat-row:hover {
   background-color: #10223a;
 }
 
+body.app-theme-dark .app-profile-edit-button {
+  background-image: linear-gradient(90deg, #1d4ed8 0%, #2563eb 100%);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.24);
+}
+body.app-theme-dark .app-profile-edit-button:hover {
+  background-image: linear-gradient(90deg, #2563eb 0%, #3b82f6 100%);
+}
+
+/* Primary actions need their own darker blue ramp instead of the light-theme one. */
+body.app-theme-dark .from-blue-600 { --tw-gradient-from: #1d4ed8 var(--tw-gradient-from-position); }
+body.app-theme-dark .to-blue-500 { --tw-gradient-to: #2563eb var(--tw-gradient-to-position); }
+body.app-theme-dark .hover\:from-blue-700:hover { --tw-gradient-from: #2563eb var(--tw-gradient-from-position); }
+body.app-theme-dark .hover\:to-blue-600:hover { --tw-gradient-to: #3b82f6 var(--tw-gradient-to-position); }
+body.app-theme-dark .company-thumbnail-upload-button {
+  background-color: #1d4ed8;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.22);
+}
+body.app-theme-dark .company-thumbnail-upload-button:hover { background-color: #2563eb; }
+
+body.app-theme-dark .company-thumbnail-manager {
+  border-color: #365277;
+  background-image: linear-gradient(135deg, #12213a 0%, #142a46 58%, #123b4c 100%);
+}
+body.app-theme-dark .company-thumbnail-preview {
+  border-color: #365277;
+  background-color: #0c182a;
+}
+body.app-theme-dark .company-thumbnail-empty {
+  border-color: #3d6695;
+  background-color: #0c182a;
+  color: #b8c7da;
+}
+
 @keyframes app-spinner-spin {
   to { transform: rotate(360deg); }
 }
