@@ -1393,8 +1393,12 @@ export function OffshoreMatchApp({
   }, [activeBuyer, activeVendorCompany, activeSection, sessionRole]);
 
   useEffect(() => {
-    setVendorProfileForm(buildVendorProfileForm(activeVendorCompany, currentVendorApplication));
-  }, [activeVendorCompany, currentVendorApplication]);
+    // An image upload updates the company record while this editor is open. Keep any
+    // unsaved text changes intact until the user explicitly saves or cancels.
+    if (!vendorProfileEditing) {
+      setVendorProfileForm(buildVendorProfileForm(activeVendorCompany, currentVendorApplication));
+    }
+  }, [activeVendorCompany, currentVendorApplication, vendorProfileEditing]);
 
   const visibleSections = useMemo(() => {
     const guestSections: Array<{ key: AppSectionKey; label: string }> = [
@@ -2252,7 +2256,6 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
 
   function applyThumbnailCompany(company: Company) {
     setActiveVendorCompany(company);
-    setVendorProfileForm(buildVendorProfileForm(company, currentVendorApplication));
     setCompanies((prev) => prev.map((entry) => (entry.id === company.id ? company : entry)));
   }
 
@@ -4451,7 +4454,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                     </div>
                       <div className="mt-4 grid gap-4">
                       {activeVendorCompany.thumbnailUrl ? (
-                        <div className="relative aspect-[16/6] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
+                        <div className="relative aspect-[16/10] max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
                           <img src={activeVendorCompany.thumbnailUrl} alt={locale === "ja" ? `${activeVendorCompany.name}の会社画像` : `${activeVendorCompany.name} company image`} className="h-full w-full object-cover" />
                           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/45 via-transparent to-transparent" />
                           <span className="absolute bottom-3 left-3 rounded-full border border-white/25 bg-slate-950/35 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
@@ -4532,7 +4535,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {!vendorProfileEditing ? (
-                        <Button onClick={() => {
+                        <Button className="app-profile-edit-button" onClick={() => {
                           setVendorProfileMessage("");
                           setVendorProfileEditing(true);
                         }}>
@@ -4563,7 +4566,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                   {!vendorProfileEditing ? (
                     <div className="mt-4 grid gap-4">
                       {activeVendorCompany?.thumbnailUrl ? (
-                        <div className="relative aspect-[16/6] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
+                        <div className="relative aspect-[16/10] max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
                           <img src={activeVendorCompany.thumbnailUrl} alt={locale === "ja" ? `${activeVendorCompany.name}の会社画像` : `${activeVendorCompany.name} company image`} className="h-full w-full object-cover" />
                           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/40 via-transparent to-transparent" />
                           <span className="absolute bottom-3 left-3 rounded-full border border-white/25 bg-slate-950/35 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
@@ -4648,26 +4651,26 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                     </div>
                   ) : (
                     <>
-                      <div className="mt-3 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-blue-50/60 p-4">
+                      <div className="company-thumbnail-manager mt-3 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-blue-50/60 p-4">
                         <div className="flex flex-wrap items-start justify-between gap-4">
                           <div>
                             <p className="text-sm font-semibold text-slate-900">{locale === "ja" ? "会社画像" : "Company Image"}</p>
                             <p className="mt-1 text-sm text-slate-600">{locale === "ja" ? "掲載企業情報と公開プロフィールに表示されます。JPG、PNG、WebP形式、2MB以下。" : "Shown on your listing and public profile. JPG, PNG, or WebP, up to 2MB."}</p>
                           </div>
                           {activeVendorCompany?.thumbnailUrl ? (
-                            <div className="relative h-24 w-40 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                            <div className="company-thumbnail-preview relative h-24 w-40 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                               <img src={activeVendorCompany.thumbnailUrl} alt={locale === "ja" ? `${activeVendorCompany.name}の会社画像` : `${activeVendorCompany.name} company image`} className="h-full w-full object-cover" />
                               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/35 to-transparent" />
                             </div>
                           ) : (
-                            <div className="flex h-24 w-40 shrink-0 flex-col items-center justify-center rounded-xl border border-dashed border-blue-200 bg-white/80 text-center text-xs font-medium text-slate-500">
+                            <div className="company-thumbnail-empty flex h-24 w-40 shrink-0 flex-col items-center justify-center rounded-xl border border-dashed border-blue-200 bg-white/80 text-center text-xs font-medium text-slate-500">
                               <ImagePlus className="mb-1 h-5 w-5 text-blue-600" />
                               {locale === "ja" ? "会社画像を追加" : "Add company image"}
                             </div>
                           )}
                         </div>
                         <div className="mt-4 flex flex-wrap items-center gap-2">
-                          <label className="inline-flex cursor-pointer items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
+                          <label className="company-thumbnail-upload-button inline-flex cursor-pointer items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
                             <span>{companyThumbnailLoading ? (locale === "ja" ? "アップロード中..." : "Uploading...") : activeVendorCompany?.thumbnailUrl ? (locale === "ja" ? "画像を変更" : "Replace Image") : (locale === "ja" ? "画像をアップロード" : "Upload Image")}</span>
                             <input
                               type="file"

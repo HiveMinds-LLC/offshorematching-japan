@@ -99,6 +99,8 @@ function toVendorApplication(row: Record<string, unknown>): VendorApplication {
       japanese_support: row.japanese_support,
       contact_name: row.contact_name,
       summary_ja: row.summary_ja,
+      thumbnail_url: row.thumbnail_url,
+      thumbnail_path: row.thumbnail_path,
       plan_key: row.plan_key
     }),
     contactName: String(row.contact_name ?? "N/A"),
@@ -930,6 +932,10 @@ async function syncVendorListingStateFromApplicationRow(client: SupabaseClient, 
     plan_key: company.plan,
     preferred_language: company.preferredLanguage ?? null,
     website_url: company.websiteUrl ?? null,
+    // An image may be uploaded while the vendor is still completing setup. Carry
+    // it forward when that draft is turned into the public profile.
+    thumbnail_url: row.thumbnail_url ? String(row.thumbnail_url) : null,
+    thumbnail_path: row.thumbnail_path ? String(row.thumbnail_path) : null,
     public_contact_email: company.publicContactEmail ?? row.contact_email ?? null,
     public_contact_phone: company.publicContactPhone ?? null,
     active: shouldBeActive
@@ -1040,6 +1046,18 @@ async function loadSupabaseCompanies(client: SupabaseClient) {
   const { data: profileRows } = await client.from("vendor_profiles").select("*").eq("active", true);
   const rows = (profileRows ?? []) as Array<Record<string, unknown>>;
   const companyIds = rows.map((row) => String(row.id));
+  const applicationIds = rows
+    .map((row) => row.application_id ? String(row.application_id) : "")
+    .filter(Boolean);
+  const { data: thumbnailApplicationRows } = applicationIds.length > 0
+    ? await client
+        .from("vendor_applications")
+        .select("id, thumbnail_url, thumbnail_path")
+        .in("id", applicationIds)
+    : { data: [] as Array<{ id: string; thumbnail_url?: string | null; thumbnail_path?: string | null }> };
+  const thumbnailByApplicationId = new Map(
+    (thumbnailApplicationRows ?? []).map((row) => [String(row.id), row as Record<string, unknown>])
+  );
   const { data: billingRows } = companyIds.length > 0
     ? await client.from("vendor_billing_accounts").select("company_id, plan_key").in("company_id", companyIds)
     : { data: [] as Array<{ company_id: string; plan_key: string | null }> };
@@ -1061,8 +1079,13 @@ async function loadSupabaseCompanies(client: SupabaseClient) {
   }
 
   const scoredRows = rows.map((row) => {
+    const applicationThumbnail = row.application_id
+      ? thumbnailByApplicationId.get(String(row.application_id))
+      : undefined;
     const normalizedRow: Record<string, unknown> = {
       ...row,
+      thumbnail_url: row.thumbnail_url ?? applicationThumbnail?.thumbnail_url ?? null,
+      thumbnail_path: row.thumbnail_path ?? applicationThumbnail?.thumbnail_path ?? null,
       plan_key: billingPlanByCompanyId.get(String(row.id)) ?? row.plan_key
     };
     const company = toCompany(normalizedRow);
@@ -1388,9 +1411,20 @@ export async function getCompanyProfile(companyId: string) {
       .eq("company_id", companyId)
       .maybeSingle();
     const completedEngagements = await listCompletedEngagementsForVendorProfile(companyId);
+    let applicationThumbnail: Record<string, unknown> | null = null;
+    if (!(profile as Record<string, unknown>).thumbnail_url && (profile as Record<string, unknown>).application_id) {
+      const { data: application } = await client
+        .from("vendor_applications")
+        .select("thumbnail_url, thumbnail_path")
+        .eq("id", String((profile as Record<string, unknown>).application_id))
+        .maybeSingle();
+      applicationThumbnail = application as Record<string, unknown> | null;
+    }
     return {
       ...toCompany({
         ...(profile as Record<string, unknown>),
+        thumbnail_url: (profile as Record<string, unknown>).thumbnail_url ?? applicationThumbnail?.thumbnail_url ?? null,
+        thumbnail_path: (profile as Record<string, unknown>).thumbnail_path ?? applicationThumbnail?.thumbnail_path ?? null,
         plan_key: billing?.plan_key ?? (profile as Record<string, unknown>).plan_key
       }),
       completedEngagements
