@@ -7,7 +7,7 @@
   --bg-1: #f6f8fc;
   --bg-2: #eaf0fb;
   --ink-strong: #0f172a;
-  --font-jp: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "YuGothic", "Noto Sans CJK JP", sans-serif;
+  --font-jp: "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "YuGothic", sans-serif;
   --font-display: "Avenir Next", "Plus Jakarta Sans", "Segoe UI", sans-serif;
 }
 
@@ -28,6 +28,12 @@ body {
   background-size: cover;
   background-attachment: fixed;
   position: relative;
+}
+
+html:lang(ja) {
+  line-break: strict;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 body::before {

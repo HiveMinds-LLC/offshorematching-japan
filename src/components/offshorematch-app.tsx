@@ -3500,7 +3500,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
           {activeSection === "marketplace" ? (
             <>
               <Card>
-                <h2 className="section-title">{locale === "ja" ? "公開ディレクトリ" : "Public Directory"}</h2>
+                <h2 className="section-title">{locale === "ja" ? "掲載企業情報" : "Public Directory"}</h2>
                 <p className="section-subtitle">{locale === "ja" ? "発注企業はログイン不要で比較可能。技術スタックと実績カテゴリを分けて絞り込めます。" : "Buyers can compare vendors without logging in. Filter separately by tech stack and project category."}</p>
                 <div className="mt-4 grid gap-3 md:grid-cols-4">
                   <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={locale === "ja" ? "会社名・実績内容で検索" : "Search company names and project examples"} />
