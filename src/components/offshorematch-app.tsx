@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { BriefcaseBusiness, Building2, ChevronDown, ChevronRight, FolderKanban, Languages, MessageSquareMore, Pencil, Sparkles, Star, Trash2, Users, Wallet } from "lucide-react";
+import { BriefcaseBusiness, Building2, ChevronDown, ChevronRight, FolderKanban, ImagePlus, Languages, MessageSquareMore, Pencil, Sparkles, Star, Trash2, Users, Wallet } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -85,6 +85,8 @@ const MARKETPLACE_PAGE_SIZE = 9;
 type MatchingStepKey = "projectGoal" | "projectTypes" | "budget" | "duration";
 type MatchingAnswers = Partial<Record<MatchingStepKey, string>>;
 const MATCHING_SESSION_STORAGE_KEY = "offshoredevelopment.matching-session.v1";
+const MAX_COMPANY_THUMBNAIL_SIZE = 2 * 1024 * 1024;
+const COMPANY_THUMBNAIL_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 const EMPTY_VENDOR_PROFILE_FORM = {
   name: "",
@@ -454,8 +456,21 @@ function CompanyCard({ company, score, locale = "ja" }: { company: Company; scor
   const primaryProjectType = company.portfolioProjects[0]?.projectType;
 
   return (
-    <Link href={`/companies/${company.id}`} className="block h-full transition hover:-translate-y-0.5">
+    <Link href={`/companies/${company.id}`} className="group block h-full transition hover:-translate-y-0.5">
       <Card className="flex h-full flex-col gap-3">
+        {company.thumbnailUrl ? (
+          <div className="relative aspect-[16/7] overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 shadow-sm">
+            <img
+              src={company.thumbnailUrl}
+              alt={locale === "ja" ? `${company.name}の会社画像` : `${company.name} company image`}
+              className="h-full w-full object-cover transition duration-500 ease-out group-hover:scale-[1.04]"
+            />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/45 via-slate-950/5 to-transparent" />
+            <span className="absolute bottom-3 left-3 rounded-full border border-white/25 bg-slate-950/35 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+              {countryLabel(company.country, locale)}
+            </span>
+          </div>
+        ) : null}
         <div className="flex items-start justify-between gap-2">
           <div>
             <h4 className="font-[family-name:var(--font-display)] text-base font-bold text-slate-900">{company.name}</h4>
@@ -574,6 +589,7 @@ export function OffshoreMatchApp({
   const [vendorProfileEditing, setVendorProfileEditing] = useState(false);
   const [vendorProfileMessage, setVendorProfileMessage] = useState("");
   const [vendorProfileSaving, setVendorProfileSaving] = useState(false);
+  const [companyThumbnailLoading, setCompanyThumbnailLoading] = useState(false);
   const [editingPortfolioProjectId, setEditingPortfolioProjectId] = useState("");
   const [portfolioDraft, setPortfolioDraft] = useState<PortfolioProject | null>(null);
   const [portfolioTechnologiesInput, setPortfolioTechnologiesInput] = useState("");
@@ -2231,6 +2247,56 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
       await persistVendorProfile();
     } finally {
       setVendorProfileSaving(false);
+    }
+  }
+
+  function applyThumbnailCompany(company: Company) {
+    setActiveVendorCompany(company);
+    setVendorProfileForm(buildVendorProfileForm(company, currentVendorApplication));
+    setCompanies((prev) => prev.map((entry) => (entry.id === company.id ? company : entry)));
+  }
+
+  async function handleCompanyThumbnailUpload(file?: File) {
+    if (!file || !activeVendorCompany) return;
+    if (!COMPANY_THUMBNAIL_TYPES.has(file.type)) {
+      setVendorProfileMessage(locale === "ja" ? "JPG、PNG、WebP形式の画像を選択してください。" : "Please select a JPG, PNG, or WebP image.");
+      return;
+    }
+    if (file.size === 0 || file.size > MAX_COMPANY_THUMBNAIL_SIZE) {
+      setVendorProfileMessage(locale === "ja" ? "会社画像は2MB以下にしてください。" : "Company images must be 2MB or smaller.");
+      return;
+    }
+    setCompanyThumbnailLoading(true);
+    setVendorProfileMessage("");
+    try {
+      const formData = new FormData();
+      formData.set("file", file);
+      const response = await fetch(`/api/vendors/companies/${activeVendorCompany.id}/thumbnail`, { method: "POST", body: formData });
+      const payload = await response.json().catch(() => ({})) as { company?: Company; error?: string };
+      if (!response.ok || !payload.company) throw new Error(payload.error ?? "画像のアップロードに失敗しました。");
+      applyThumbnailCompany(payload.company);
+      toast({ tone: "success", title: locale === "ja" ? "会社画像を更新しました" : "Company image updated" });
+    } catch (error) {
+      setVendorProfileMessage(error instanceof Error ? error.message : (locale === "ja" ? "画像のアップロードに失敗しました。" : "Could not upload the image."));
+    } finally {
+      setCompanyThumbnailLoading(false);
+    }
+  }
+
+  async function handleCompanyThumbnailDelete() {
+    if (!activeVendorCompany) return;
+    setCompanyThumbnailLoading(true);
+    setVendorProfileMessage("");
+    try {
+      const response = await fetch(`/api/vendors/companies/${activeVendorCompany.id}/thumbnail`, { method: "DELETE" });
+      const payload = await response.json().catch(() => ({})) as { company?: Company; error?: string };
+      if (!response.ok || !payload.company) throw new Error(payload.error ?? "画像の削除に失敗しました。");
+      applyThumbnailCompany(payload.company);
+      toast({ tone: "info", title: locale === "ja" ? "会社画像を削除しました" : "Company image removed" });
+    } catch (error) {
+      setVendorProfileMessage(error instanceof Error ? error.message : (locale === "ja" ? "画像の削除に失敗しました。" : "Could not remove the image."));
+    } finally {
+      setCompanyThumbnailLoading(false);
     }
   }
 
@@ -4383,7 +4449,16 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                         {locale === "ja" ? "公開ページを見る" : "View Public Page"}
                       </Link>
                     </div>
-                    <div className="mt-4 grid gap-4">
+                      <div className="mt-4 grid gap-4">
+                      {activeVendorCompany.thumbnailUrl ? (
+                        <div className="relative aspect-[16/6] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
+                          <img src={activeVendorCompany.thumbnailUrl} alt={locale === "ja" ? `${activeVendorCompany.name}の会社画像` : `${activeVendorCompany.name} company image`} className="h-full w-full object-cover" />
+                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/45 via-transparent to-transparent" />
+                          <span className="absolute bottom-3 left-3 rounded-full border border-white/25 bg-slate-950/35 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+                            {locale === "ja" ? "掲載プレビュー" : "Listing preview"}
+                          </span>
+                        </div>
+                      ) : null}
                       <div>
                         <h3 className="font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">{activeVendorCompany.name}</h3>
                         <p className="mt-1 text-sm text-slate-500">{countryLabel(activeVendorCompany.country, locale)} / {locale === "ja" ? planLabel(effectiveVendorPlan) : effectiveVendorPlan === "translation" ? "Translation" : "Standard"}</p>
@@ -4487,6 +4562,15 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
 
                   {!vendorProfileEditing ? (
                     <div className="mt-4 grid gap-4">
+                      {activeVendorCompany?.thumbnailUrl ? (
+                        <div className="relative aspect-[16/6] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
+                          <img src={activeVendorCompany.thumbnailUrl} alt={locale === "ja" ? `${activeVendorCompany.name}の会社画像` : `${activeVendorCompany.name} company image`} className="h-full w-full object-cover" />
+                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/40 via-transparent to-transparent" />
+                          <span className="absolute bottom-3 left-3 rounded-full border border-white/25 bg-slate-950/35 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+                            {locale === "ja" ? "掲載中の会社画像" : "Live company image"}
+                          </span>
+                        </div>
+                      ) : null}
                       <div className="grid gap-3 sm:grid-cols-2">
                         <Card className="border-slate-100 bg-slate-50 p-4 shadow-none">
                           <p className="text-xs font-semibold text-slate-500">{locale === "ja" ? "会社名" : "Company Name"}</p>
@@ -4564,6 +4648,45 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                     </div>
                   ) : (
                     <>
+                      <div className="mt-3 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-blue-50/60 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">{locale === "ja" ? "会社画像" : "Company Image"}</p>
+                            <p className="mt-1 text-sm text-slate-600">{locale === "ja" ? "掲載企業情報と公開プロフィールに表示されます。JPG、PNG、WebP形式、2MB以下。" : "Shown on your listing and public profile. JPG, PNG, or WebP, up to 2MB."}</p>
+                          </div>
+                          {activeVendorCompany?.thumbnailUrl ? (
+                            <div className="relative h-24 w-40 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                              <img src={activeVendorCompany.thumbnailUrl} alt={locale === "ja" ? `${activeVendorCompany.name}の会社画像` : `${activeVendorCompany.name} company image`} className="h-full w-full object-cover" />
+                              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/35 to-transparent" />
+                            </div>
+                          ) : (
+                            <div className="flex h-24 w-40 shrink-0 flex-col items-center justify-center rounded-xl border border-dashed border-blue-200 bg-white/80 text-center text-xs font-medium text-slate-500">
+                              <ImagePlus className="mb-1 h-5 w-5 text-blue-600" />
+                              {locale === "ja" ? "会社画像を追加" : "Add company image"}
+                            </div>
+                          )}
+                        </div>
+                        <div className="mt-4 flex flex-wrap items-center gap-2">
+                          <label className="inline-flex cursor-pointer items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
+                            <span>{companyThumbnailLoading ? (locale === "ja" ? "アップロード中..." : "Uploading...") : activeVendorCompany?.thumbnailUrl ? (locale === "ja" ? "画像を変更" : "Replace Image") : (locale === "ja" ? "画像をアップロード" : "Upload Image")}</span>
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              className="sr-only"
+                              disabled={companyThumbnailLoading}
+                              onChange={(event) => {
+                                void handleCompanyThumbnailUpload(event.target.files?.[0]);
+                                event.currentTarget.value = "";
+                              }}
+                            />
+                          </label>
+                          {activeVendorCompany?.thumbnailUrl ? (
+                            <Button variant="ghost" disabled={companyThumbnailLoading} onClick={() => void handleCompanyThumbnailDelete()}>
+                              {locale === "ja" ? "画像を削除" : "Remove Image"}
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
                       <div className="mt-3 grid gap-3 sm:grid-cols-2">
                         <Field label={locale === "ja" ? "会社名" : "Company Name"}>
                           <Input

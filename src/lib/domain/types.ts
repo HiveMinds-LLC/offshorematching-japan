@@ -42,6 +42,8 @@ export type Company = {
   removedAt?: string;
   removedReason?: string;
   websiteUrl?: string;
+  thumbnailUrl?: string;
+  thumbnailPath?: string;
   publicContactEmail?: string;
   publicContactPhone?: string;
   preferredLanguage?: VendorPreferredLanguage;

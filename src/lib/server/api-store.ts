@@ -53,6 +53,8 @@ function toCompany(row: Record<string, unknown>): Company {
     removedAt: row.removed_at ? String(row.removed_at) : undefined,
     removedReason: row.removed_reason ? String(row.removed_reason) : undefined,
     websiteUrl: row.website_url ? String(row.website_url) : undefined,
+    thumbnailUrl: row.thumbnail_url ? String(row.thumbnail_url) : undefined,
+    thumbnailPath: row.thumbnail_path ? String(row.thumbnail_path) : undefined,
     publicContactEmail: row.public_contact_email ? String(row.public_contact_email) : undefined,
     publicContactPhone: row.public_contact_phone ? String(row.public_contact_phone) : undefined,
     preferredLanguage: row.preferred_language ? (String(row.preferred_language) as Company["preferredLanguage"]) : undefined,
@@ -1533,6 +1535,57 @@ export async function updateCompanyProfile(
   return null;
 }
 
+export async function replaceCompanyThumbnail(companyId: string, file: File) {
+  if (!isSupabaseConfigured()) throw new Error("Supabase storage is not configured.");
+  const client = serviceClient();
+  if (!client) throw new Error("Supabase storage is not configured.");
+
+  const company = await getCompanyProfile(companyId);
+  if (!company) throw new Error("Company not found.");
+  const path = `${companyId}/thumbnail`;
+  const { error: uploadError } = await client.storage.from("company-thumbnails").upload(path, await file.arrayBuffer(), {
+    contentType: file.type,
+    upsert: true,
+    cacheControl: "3600"
+  });
+  if (uploadError) throw new Error(uploadError.message);
+
+  const { data: publicUrlData } = client.storage.from("company-thumbnails").getPublicUrl(path);
+  const updated = await updateCompanyThumbnail(companyId, `${publicUrlData.publicUrl}?v=${Date.now()}`, path);
+  if (!updated) {
+    await client.storage.from("company-thumbnails").remove([path]);
+    throw new Error("Could not save the company thumbnail.");
+  }
+  if (company.thumbnailPath && company.thumbnailPath !== path) await client.storage.from("company-thumbnails").remove([company.thumbnailPath]);
+  return updated;
+}
+
+export async function removeCompanyThumbnail(companyId: string) {
+  const company = await getCompanyProfile(companyId);
+  if (!company) return null;
+  const updated = await updateCompanyThumbnail(companyId, undefined, undefined);
+  if (updated && company.thumbnailPath && isSupabaseConfigured()) {
+    const client = serviceClient();
+    if (client) await client.storage.from("company-thumbnails").remove([company.thumbnailPath]);
+  }
+  return updated;
+}
+
+async function updateCompanyThumbnail(companyId: string, thumbnailUrl?: string, thumbnailPath?: string) {
+  if (!isSupabaseConfigured()) return mockDb.updateCompany(companyId, { thumbnailUrl, thumbnailPath });
+  const client = serviceClient();
+  if (!client) return mockDb.updateCompany(companyId, { thumbnailUrl, thumbnailPath });
+  const thumbnailPayload = { thumbnail_url: thumbnailUrl ?? null, thumbnail_path: thumbnailPath ?? null };
+  const { data: profile } = await client.from("vendor_profiles").update(thumbnailPayload).eq("id", companyId).select("*").maybeSingle();
+  if (profile) {
+    const applicationId = (profile as { application_id?: string | null }).application_id;
+    if (applicationId) await client.from("vendor_applications").update(thumbnailPayload).eq("id", applicationId);
+    return toCompany(profile as Record<string, unknown>);
+  }
+  const { data: application } = await client.from("vendor_applications").update(thumbnailPayload).eq("id", companyId).select("*").maybeSingle();
+  return application ? toCompany(application as Record<string, unknown>) : null;
+}
+
 export async function reviewVendorApplication(
   id: string,
   decision: "approved" | "changes_requested" | "rejected",
@@ -1580,6 +1633,8 @@ export async function reviewVendorApplication(
         plan_key: data.plan_key,
         preferred_language: data.preferred_language,
         website_url: data.website_url,
+        thumbnail_url: data.thumbnail_url,
+        thumbnail_path: data.thumbnail_path,
         public_contact_email: data.public_contact_email,
         public_contact_phone: data.public_contact_phone
       });
@@ -2976,4 +3031,3 @@ export async function adminRenewVendorAccess(companyId: string, accessEndsAt: st
   const { data } = await service.from("vendor_billing_accounts").select("*").eq("company_id", companyId).maybeSingle();
   return { ok: true as const, billingAccount: data ? toBillingAccount(data as Record<string, unknown>) : null };
 }
-

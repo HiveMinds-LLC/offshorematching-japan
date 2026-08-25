@@ -228,6 +228,19 @@ export function CompanyProfilePageClient({
           </div>
 
           <>
+              {company.thumbnailUrl ? (
+                <div className="relative aspect-[16/6] overflow-hidden rounded-[24px] border border-slate-100 bg-slate-50 shadow-sm">
+                  <img
+                    src={company.thumbnailUrl}
+                    alt={locale === "ja" ? `${company.name}の会社画像` : `${company.name} company image`}
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/45 via-slate-950/5 to-transparent" />
+                  <span className="absolute bottom-4 left-4 rounded-full border border-white/25 bg-slate-950/35 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
+                    {countryLabel(company.country, locale)}
+                  </span>
+                </div>
+              ) : null}
               <div>
                 <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold text-slate-900">{company.name}</h2>
                 <p className="mt-1 text-sm text-slate-600">{countryLabel(company.country, locale)}</p>
