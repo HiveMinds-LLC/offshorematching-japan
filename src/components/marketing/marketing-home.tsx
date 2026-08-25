@@ -73,6 +73,24 @@ export function MarketingHome() {
       a: isJa
         ? "開発会社は登録後に決済と必須プロフィール入力を完了すると自動で公開されます。公開後はプロフィール更新、問い合わせ対応、請求管理をダッシュボードで行えます。"
         : "After signup, vendors go live automatically once billing and the required profile fields are complete. From there, the dashboard handles profile updates, buyer inquiries, and billing."
+    },
+    {
+      q: isJa ? "どのような条件で開発会社を絞り込めますか？" : "Which criteria can I use to filter companies?",
+      a: isJa
+        ? "会社名や実績内容に加え、技術スタック、実績カテゴリ、時間単価の上限で候補を絞り込めます。"
+        : "You can narrow candidates by company name or project history, tech stack, project category, and hourly-rate ceiling."
+    },
+    {
+      q: isJa ? "案件マッチングでは何ができますか？" : "What does project matching do?",
+      a: isJa
+        ? "作りたいもの、案件タイプ、予算、期間を順に整理し、条件に合う開発会社を比較しやすい候補として提示します。"
+        : "It organizes what you want to build, the project type, budget, and timeline, then presents companies that are easier to compare against those requirements."
+    },
+    {
+      q: isJa ? "日本語以外の言語でもやり取りできますか？" : "Can companies communicate in languages other than Japanese?",
+      a: isJa
+        ? "通常チャットに加え、翻訳付きプランでは会社の優先言語を基準にプロフィールとチャットの翻訳を利用できます。"
+        : "Alongside standard chat, the translation plan supports profile and chat translation based on a company’s preferred language."
     }
   ];
 
@@ -111,11 +129,7 @@ export function MarketingHome() {
               </p>
               <h1 className="mt-5 max-w-3xl font-[family-name:var(--font-display)] text-4xl font-extrabold leading-[1.12] tracking-tight text-slate-950 sm:text-5xl lg:text-4xl">
                 {locale === "ja" ? (
-                  <>
-                    オフショア開発を、
-                    <br />
-                    <span className="text-blue-700">もっと早く、確かに。</span>
-                  </>
+                  <>オフショア開発を、<span className="text-blue-700">もっと早く、確かに。</span></>
                 ) : (
                   <>
                     Turn offshore vendor
@@ -279,11 +293,7 @@ export function MarketingHome() {
                 <p className="text-xs font-semibold tracking-[0.18em] text-cyan-300">START NOW</p>
                 <h2 className="mt-3 font-[family-name:var(--font-display)] text-4xl font-bold text-white md:text-5xl">
                   {isJa ? (
-                    <>
-                      開発会社選びを、
-                      <br />
-                      今日から始める。
-                    </>
+                    <>開発会社選びを、今日から始める。</>
                   ) : (
                     <>
                       Start comparing offshore

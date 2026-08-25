@@ -42,11 +42,7 @@ export default function BuyerMarketPage() {
               <p className="inline-flex rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-semibold text-blue-700">FOR BUYERS</p>
               <h1 className="mt-5 font-[family-name:var(--font-display)] text-4xl font-extrabold leading-[1.1] text-slate-900 sm:text-5xl">
                 {locale === "ja" ? (
-                  <>
-                    発注企業向け
-                    <br />
-                    比較と相談の導線
-                  </>
+                  <>発注企業向け比較と相談の導線</>
                 ) : (
                   <>
                     A buyer flow built for
