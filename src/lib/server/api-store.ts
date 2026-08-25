@@ -55,6 +55,8 @@ function toCompany(row: Record<string, unknown>): Company {
     websiteUrl: row.website_url ? String(row.website_url) : undefined,
     thumbnailUrl: row.thumbnail_url ? String(row.thumbnail_url) : undefined,
     thumbnailPath: row.thumbnail_path ? String(row.thumbnail_path) : undefined,
+    thumbnailCardUrl: row.thumbnail_card_url ? String(row.thumbnail_card_url) : undefined,
+    thumbnailCardPath: row.thumbnail_card_path ? String(row.thumbnail_card_path) : undefined,
     publicContactEmail: row.public_contact_email ? String(row.public_contact_email) : undefined,
     publicContactPhone: row.public_contact_phone ? String(row.public_contact_phone) : undefined,
     preferredLanguage: row.preferred_language ? (String(row.preferred_language) as Company["preferredLanguage"]) : undefined,
@@ -101,6 +103,8 @@ function toVendorApplication(row: Record<string, unknown>): VendorApplication {
       summary_ja: row.summary_ja,
       thumbnail_url: row.thumbnail_url,
       thumbnail_path: row.thumbnail_path,
+      thumbnail_card_url: row.thumbnail_card_url,
+      thumbnail_card_path: row.thumbnail_card_path,
       plan_key: row.plan_key
     }),
     contactName: String(row.contact_name ?? "N/A"),
@@ -936,6 +940,8 @@ async function syncVendorListingStateFromApplicationRow(client: SupabaseClient, 
     // it forward when that draft is turned into the public profile.
     thumbnail_url: row.thumbnail_url ? String(row.thumbnail_url) : null,
     thumbnail_path: row.thumbnail_path ? String(row.thumbnail_path) : null,
+    thumbnail_card_url: row.thumbnail_card_url ? String(row.thumbnail_card_url) : null,
+    thumbnail_card_path: row.thumbnail_card_path ? String(row.thumbnail_card_path) : null,
     public_contact_email: company.publicContactEmail ?? row.contact_email ?? null,
     public_contact_phone: company.publicContactPhone ?? null,
     active: shouldBeActive
@@ -1052,9 +1058,9 @@ async function loadSupabaseCompanies(client: SupabaseClient) {
   const { data: thumbnailApplicationRows } = applicationIds.length > 0
     ? await client
         .from("vendor_applications")
-        .select("id, thumbnail_url, thumbnail_path")
+        .select("id, thumbnail_url, thumbnail_path, thumbnail_card_url, thumbnail_card_path")
         .in("id", applicationIds)
-    : { data: [] as Array<{ id: string; thumbnail_url?: string | null; thumbnail_path?: string | null }> };
+    : { data: [] as Array<{ id: string; thumbnail_url?: string | null; thumbnail_path?: string | null; thumbnail_card_url?: string | null; thumbnail_card_path?: string | null }> };
   const thumbnailByApplicationId = new Map(
     (thumbnailApplicationRows ?? []).map((row) => [String(row.id), row as Record<string, unknown>])
   );
@@ -1086,6 +1092,8 @@ async function loadSupabaseCompanies(client: SupabaseClient) {
       ...row,
       thumbnail_url: row.thumbnail_url ?? applicationThumbnail?.thumbnail_url ?? null,
       thumbnail_path: row.thumbnail_path ?? applicationThumbnail?.thumbnail_path ?? null,
+      thumbnail_card_url: row.thumbnail_card_url ?? applicationThumbnail?.thumbnail_card_url ?? null,
+      thumbnail_card_path: row.thumbnail_card_path ?? applicationThumbnail?.thumbnail_card_path ?? null,
       plan_key: billingPlanByCompanyId.get(String(row.id)) ?? row.plan_key
     };
     const company = toCompany(normalizedRow);
@@ -1415,7 +1423,7 @@ export async function getCompanyProfile(companyId: string) {
     if (!(profile as Record<string, unknown>).thumbnail_url && (profile as Record<string, unknown>).application_id) {
       const { data: application } = await client
         .from("vendor_applications")
-        .select("thumbnail_url, thumbnail_path")
+        .select("thumbnail_url, thumbnail_path, thumbnail_card_url, thumbnail_card_path")
         .eq("id", String((profile as Record<string, unknown>).application_id))
         .maybeSingle();
       applicationThumbnail = application as Record<string, unknown> | null;
@@ -1425,6 +1433,8 @@ export async function getCompanyProfile(companyId: string) {
         ...(profile as Record<string, unknown>),
         thumbnail_url: (profile as Record<string, unknown>).thumbnail_url ?? applicationThumbnail?.thumbnail_url ?? null,
         thumbnail_path: (profile as Record<string, unknown>).thumbnail_path ?? applicationThumbnail?.thumbnail_path ?? null,
+        thumbnail_card_url: (profile as Record<string, unknown>).thumbnail_card_url ?? applicationThumbnail?.thumbnail_card_url ?? null,
+        thumbnail_card_path: (profile as Record<string, unknown>).thumbnail_card_path ?? applicationThumbnail?.thumbnail_card_path ?? null,
         plan_key: billing?.plan_key ?? (profile as Record<string, unknown>).plan_key
       }),
       completedEngagements
@@ -1569,47 +1579,67 @@ export async function updateCompanyProfile(
   return null;
 }
 
-export async function replaceCompanyThumbnail(companyId: string, file: File) {
+export async function replaceCompanyThumbnail(companyId: string, detailFile: File, cardFile: File) {
   if (!isSupabaseConfigured()) throw new Error("Supabase storage is not configured.");
   const client = serviceClient();
   if (!client) throw new Error("Supabase storage is not configured.");
 
   const company = await getCompanyProfile(companyId);
   if (!company) throw new Error("Company not found.");
-  const path = `${companyId}/thumbnail`;
-  const { error: uploadError } = await client.storage.from("company-thumbnails").upload(path, await file.arrayBuffer(), {
-    contentType: file.type,
-    upsert: true,
-    cacheControl: "3600"
-  });
-  if (uploadError) throw new Error(uploadError.message);
+  const detailPath = `${companyId}/thumbnail`;
+  const cardPath = `${companyId}/thumbnail-card`;
+  const bucket = client.storage.from("company-thumbnails");
+  const [detailUpload, cardUpload] = await Promise.all([
+    bucket.upload(detailPath, await detailFile.arrayBuffer(), { contentType: detailFile.type, upsert: true, cacheControl: "3600" }),
+    bucket.upload(cardPath, await cardFile.arrayBuffer(), { contentType: cardFile.type, upsert: true, cacheControl: "3600" })
+  ]);
+  if (detailUpload.error || cardUpload.error) {
+    await bucket.remove([detailPath, cardPath]);
+    throw new Error(detailUpload.error?.message ?? cardUpload.error?.message ?? "Could not upload the company image.");
+  }
 
-  const { data: publicUrlData } = client.storage.from("company-thumbnails").getPublicUrl(path);
-  const updated = await updateCompanyThumbnail(companyId, `${publicUrlData.publicUrl}?v=${Date.now()}`, path);
+  const version = Date.now();
+  const { data: detailUrlData } = bucket.getPublicUrl(detailPath);
+  const { data: cardUrlData } = bucket.getPublicUrl(cardPath);
+  const updated = await updateCompanyThumbnail(
+    companyId,
+    `${detailUrlData.publicUrl}?v=${version}`,
+    detailPath,
+    `${cardUrlData.publicUrl}?v=${version}`,
+    cardPath
+  );
   if (!updated) {
-    await client.storage.from("company-thumbnails").remove([path]);
+    await bucket.remove([detailPath, cardPath]);
     throw new Error("Could not save the company thumbnail.");
   }
-  if (company.thumbnailPath && company.thumbnailPath !== path) await client.storage.from("company-thumbnails").remove([company.thumbnailPath]);
+  const obsoletePaths = [company.thumbnailPath, company.thumbnailCardPath]
+    .filter((path): path is string => Boolean(path && path !== detailPath && path !== cardPath));
+  if (obsoletePaths.length) await bucket.remove(obsoletePaths);
   return updated;
 }
 
 export async function removeCompanyThumbnail(companyId: string) {
   const company = await getCompanyProfile(companyId);
   if (!company) return null;
-  const updated = await updateCompanyThumbnail(companyId, undefined, undefined);
-  if (updated && company.thumbnailPath && isSupabaseConfigured()) {
+  const updated = await updateCompanyThumbnail(companyId, undefined, undefined, undefined, undefined);
+  const paths = [company.thumbnailPath, company.thumbnailCardPath].filter((path): path is string => Boolean(path));
+  if (updated && paths.length && isSupabaseConfigured()) {
     const client = serviceClient();
-    if (client) await client.storage.from("company-thumbnails").remove([company.thumbnailPath]);
+    if (client) await client.storage.from("company-thumbnails").remove(paths);
   }
   return updated;
 }
 
-async function updateCompanyThumbnail(companyId: string, thumbnailUrl?: string, thumbnailPath?: string) {
-  if (!isSupabaseConfigured()) return mockDb.updateCompany(companyId, { thumbnailUrl, thumbnailPath });
+async function updateCompanyThumbnail(companyId: string, thumbnailUrl?: string, thumbnailPath?: string, thumbnailCardUrl?: string, thumbnailCardPath?: string) {
+  if (!isSupabaseConfigured()) return mockDb.updateCompany(companyId, { thumbnailUrl, thumbnailPath, thumbnailCardUrl, thumbnailCardPath });
   const client = serviceClient();
-  if (!client) return mockDb.updateCompany(companyId, { thumbnailUrl, thumbnailPath });
-  const thumbnailPayload = { thumbnail_url: thumbnailUrl ?? null, thumbnail_path: thumbnailPath ?? null };
+  if (!client) return mockDb.updateCompany(companyId, { thumbnailUrl, thumbnailPath, thumbnailCardUrl, thumbnailCardPath });
+  const thumbnailPayload = {
+    thumbnail_url: thumbnailUrl ?? null,
+    thumbnail_path: thumbnailPath ?? null,
+    thumbnail_card_url: thumbnailCardUrl ?? null,
+    thumbnail_card_path: thumbnailCardPath ?? null
+  };
   const { data: profile } = await client.from("vendor_profiles").update(thumbnailPayload).eq("id", companyId).select("*").maybeSingle();
   if (profile) {
     const applicationId = (profile as { application_id?: string | null }).application_id;
@@ -1669,6 +1699,8 @@ export async function reviewVendorApplication(
         website_url: data.website_url,
         thumbnail_url: data.thumbnail_url,
         thumbnail_path: data.thumbnail_path,
+        thumbnail_card_url: data.thumbnail_card_url,
+        thumbnail_card_path: data.thumbnail_card_path,
         public_contact_email: data.public_contact_email,
         public_contact_phone: data.public_contact_phone
       });
