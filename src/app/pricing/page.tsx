@@ -20,7 +20,7 @@ export default function PricingPage() {
               <p className="inline-flex rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-semibold text-blue-700">PRICING</p>
               <h1 className="mt-5 font-[family-name:var(--font-display)] text-4xl font-extrabold leading-[1.1] text-slate-900 sm:text-5xl">
                 {locale === "ja" ? (
-                  <>シンプルな料金体系で、今すぐ使えます。</>
+                  <><span className="inline-block">シンプルな料金体系で、</span><span className="inline-block">今すぐ使えます。</span></>
                 ) : (
                   <>
                     Simple pricing,

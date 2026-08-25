@@ -129,7 +129,7 @@ export function MarketingHome() {
               </p>
               <h1 className="mt-5 max-w-3xl font-[family-name:var(--font-display)] text-4xl font-extrabold leading-[1.12] tracking-tight text-slate-950 sm:text-5xl lg:text-4xl">
                 {locale === "ja" ? (
-                  <>オフショア開発を、<span className="text-blue-700">もっと早く、確かに。</span></>
+                  <><span className="inline-block">オフショア開発を、</span><span className="inline-block text-blue-700">もっと早く、</span><span className="inline-block text-blue-700">確かに。</span></>
                 ) : (
                   <>
                     Turn offshore vendor
@@ -293,7 +293,7 @@ export function MarketingHome() {
                 <p className="text-xs font-semibold tracking-[0.18em] text-cyan-300">START NOW</p>
                 <h2 className="mt-3 font-[family-name:var(--font-display)] text-4xl font-bold text-white md:text-5xl">
                   {isJa ? (
-                    <>開発会社選びを、今日から始める。</>
+                    <><span className="inline-block">開発会社選びを、</span><span className="inline-block">今日から始める。</span></>
                   ) : (
                     <>
                       Start comparing offshore
