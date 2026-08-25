@@ -5,7 +5,8 @@ import { getCurrentVendorSession } from "@/lib/server/vendor-auth";
 
 type Params = { params: Promise<{ id: string }> };
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024;
+const MAX_FILE_SIZE = 512 * 1024;
+const MAX_CARD_FILE_SIZE = 160 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 function detectImageMimeType(bytes: Uint8Array) {
@@ -18,6 +19,14 @@ function detectImageMimeType(bytes: Uint8Array) {
   return null;
 }
 
+async function validateImage(file: File, maxSize: number) {
+  if (!ALLOWED_TYPES.has(file.type)) return "JPG、PNG、WebP形式の画像を選択してください。";
+  if (file.size === 0 || file.size > maxSize) return `最適化後の画像は${maxSize === MAX_CARD_FILE_SIZE ? "160KB" : "512KB"}以下にしてください。`;
+  const actualMimeType = detectImageMimeType(new Uint8Array(await file.slice(0, 32).arrayBuffer()));
+  if (!actualMimeType || actualMimeType !== file.type) return "画像ファイルの形式を確認できません。JPG、PNG、WebP形式の画像を選択してください。";
+  return null;
+}
+
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params;
   const vendor = await getCurrentVendorSession();
@@ -26,14 +35,16 @@ export async function POST(request: Request, { params }: Params) {
 
   const formData = await request.formData().catch(() => null);
   const file = formData?.get("file");
+  const cardFile = formData?.get("cardFile");
   if (!(file instanceof File)) return NextResponse.json({ error: "画像ファイルを選択してください。" }, { status: 400 });
-  if (!ALLOWED_TYPES.has(file.type)) return NextResponse.json({ error: "JPG、PNG、WebP形式の画像を選択してください。" }, { status: 400 });
-  if (file.size === 0 || file.size > MAX_FILE_SIZE) return NextResponse.json({ error: "画像は2MB以下にしてください。" }, { status: 400 });
-  const actualMimeType = detectImageMimeType(new Uint8Array(await file.slice(0, 32).arrayBuffer()));
-  if (!actualMimeType || actualMimeType !== file.type) return NextResponse.json({ error: "画像ファイルの形式を確認できません。JPG、PNG、WebP形式の画像を選択してください。" }, { status: 400 });
+  if (!(cardFile instanceof File)) return NextResponse.json({ error: "カード用の画像を作成できませんでした。もう一度お試しください。" }, { status: 400 });
+  const detailError = await validateImage(file, MAX_FILE_SIZE);
+  if (detailError) return NextResponse.json({ error: detailError }, { status: 400 });
+  const cardError = await validateImage(cardFile, MAX_CARD_FILE_SIZE);
+  if (cardError) return NextResponse.json({ error: cardError }, { status: 400 });
 
   try {
-    const company = await replaceCompanyThumbnail(id, file);
+    const company = await replaceCompanyThumbnail(id, file, cardFile);
     return NextResponse.json({ company });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "画像のアップロードに失敗しました。" }, { status: 500 });

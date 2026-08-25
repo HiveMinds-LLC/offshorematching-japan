@@ -85,8 +85,11 @@ const MARKETPLACE_PAGE_SIZE = 9;
 type MatchingStepKey = "projectGoal" | "projectTypes" | "budget" | "duration";
 type MatchingAnswers = Partial<Record<MatchingStepKey, string>>;
 const MATCHING_SESSION_STORAGE_KEY = "offshoredevelopment.matching-session.v1";
-const MAX_COMPANY_THUMBNAIL_SIZE = 2 * 1024 * 1024;
+const MAX_COMPANY_THUMBNAIL_SOURCE_SIZE = 8 * 1024 * 1024;
+const COMPANY_THUMBNAIL_TARGET_SIZE = 320 * 1024;
+const COMPANY_THUMBNAIL_CARD_TARGET_SIZE = 120 * 1024;
 const COMPANY_THUMBNAIL_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const COMPANY_THUMBNAIL_MAX_EDGE = 1200;
 
 const EMPTY_VENDOR_PROFILE_FORM = {
   name: "",
@@ -458,12 +461,15 @@ function CompanyCard({ company, score, locale = "ja" }: { company: Company; scor
   return (
     <Link href={`/companies/${company.id}`} className="group block h-full transition hover:-translate-y-0.5">
       <Card className="flex h-full flex-col gap-3">
-        {company.thumbnailUrl ? (
+        {company.thumbnailUrl || company.thumbnailCardUrl ? (
           <div className="relative aspect-[16/7] overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 shadow-sm">
             <img
-              src={company.thumbnailUrl}
+              src={company.thumbnailCardUrl ?? company.thumbnailUrl}
               alt={locale === "ja" ? `${company.name}の会社画像` : `${company.name} company image`}
               className="h-full w-full object-cover transition duration-500 ease-out group-hover:scale-[1.04]"
+              loading="lazy"
+              decoding="async"
+              fetchPriority="low"
             />
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/45 via-slate-950/5 to-transparent" />
             <span className="absolute bottom-3 left-3 rounded-full border border-white/25 bg-slate-950/35 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
@@ -514,6 +520,38 @@ function CompanyCard({ company, score, locale = "ja" }: { company: Company; scor
       </Card>
     </Link>
   );
+}
+
+async function optimizeCompanyThumbnail(file: File, maxEdge: number, targetSize: number, preferOptimized = false) {
+  if (typeof createImageBitmap === "undefined") return file;
+
+  let bitmap: ImageBitmap | null = null;
+  try {
+    bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) return file;
+    context.drawImage(bitmap, 0, 0, width, height);
+    let optimizedBlob: Blob | null = null;
+    for (const quality of [0.76, 0.66, 0.56, 0.48, 0.4, 0.34, 0.26]) {
+      const candidate = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", quality));
+      if (!candidate) continue;
+      optimizedBlob = candidate;
+      if (candidate.size <= targetSize) break;
+    }
+    if (!optimizedBlob || (!preferOptimized && optimizedBlob.size >= file.size)) return file;
+    const baseName = file.name.replace(/\.[^/.]+$/, "") || "company-thumbnail";
+    return new File([optimizedBlob], `${baseName}.webp`, { type: "image/webp" });
+  } catch {
+    return file;
+  } finally {
+    bitmap?.close();
+  }
 }
 
 export function OffshoreMatchApp({
@@ -2265,15 +2303,20 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
       setVendorProfileMessage(locale === "ja" ? "JPG、PNG、WebP形式の画像を選択してください。" : "Please select a JPG, PNG, or WebP image.");
       return;
     }
-    if (file.size === 0 || file.size > MAX_COMPANY_THUMBNAIL_SIZE) {
-      setVendorProfileMessage(locale === "ja" ? "会社画像は2MB以下にしてください。" : "Company images must be 2MB or smaller.");
+    if (file.size === 0 || file.size > MAX_COMPANY_THUMBNAIL_SOURCE_SIZE) {
+      setVendorProfileMessage(locale === "ja" ? "会社画像は8MB以下の画像を選択してください。アップロード時に最適化されます。" : "Please select an image up to 8MB. It will be optimized before upload.");
       return;
     }
     setCompanyThumbnailLoading(true);
     setVendorProfileMessage("");
     try {
+      const [optimizedFile, cardFile] = await Promise.all([
+        optimizeCompanyThumbnail(file, COMPANY_THUMBNAIL_MAX_EDGE, COMPANY_THUMBNAIL_TARGET_SIZE),
+        optimizeCompanyThumbnail(file, 640, COMPANY_THUMBNAIL_CARD_TARGET_SIZE, true)
+      ]);
       const formData = new FormData();
-      formData.set("file", file);
+      formData.set("file", optimizedFile);
+      formData.set("cardFile", cardFile);
       const response = await fetch(`/api/vendors/companies/${activeVendorCompany.id}/thumbnail`, { method: "POST", body: formData });
       const payload = await response.json().catch(() => ({})) as { company?: Company; error?: string };
       if (!response.ok || !payload.company) throw new Error(payload.error ?? "画像のアップロードに失敗しました。");
@@ -4655,7 +4698,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                         <div className="flex flex-wrap items-start justify-between gap-4">
                           <div>
                             <p className="text-sm font-semibold text-slate-900">{locale === "ja" ? "会社画像" : "Company Image"}</p>
-                            <p className="mt-1 text-sm text-slate-600">{locale === "ja" ? "掲載企業情報と公開プロフィールに表示されます。JPG、PNG、WebP形式、2MB以下。" : "Shown on your listing and public profile. JPG, PNG, or WebP, up to 2MB."}</p>
+                            <p className="mt-1 text-sm text-slate-600">{locale === "ja" ? "掲載企業情報と公開プロフィールに表示されます。JPG、PNG、WebP形式。アップロード時に軽量なWebPへ最適化します。" : "Shown on your listing and public profile. JPG, PNG, and WebP are optimized into a lightweight WebP before upload."}</p>
                           </div>
                           {activeVendorCompany?.thumbnailUrl ? (
                             <div className="company-thumbnail-preview relative h-24 w-40 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">

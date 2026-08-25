@@ -44,6 +44,8 @@ export type Company = {
   websiteUrl?: string;
   thumbnailUrl?: string;
   thumbnailPath?: string;
+  thumbnailCardUrl?: string;
+  thumbnailCardPath?: string;
   publicContactEmail?: string;
   publicContactPhone?: string;
   preferredLanguage?: VendorPreferredLanguage;

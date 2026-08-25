@@ -229,7 +229,7 @@ export function CompanyProfilePageClient({
 
           <>
               {company.thumbnailUrl ? (
-                <div className="relative aspect-[16/6] overflow-hidden rounded-[24px] border border-slate-100 bg-slate-50 shadow-sm">
+                <div className="relative aspect-[16/8] max-w-2xl overflow-hidden rounded-[24px] border border-slate-100 bg-slate-50 shadow-sm">
                   <img
                     src={company.thumbnailUrl}
                     alt={locale === "ja" ? `${company.name}の会社画像` : `${company.name} company image`}
