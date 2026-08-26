@@ -32,7 +32,7 @@ function toCompany(body: Record<string, unknown>): Company {
   return {
     id: "",
     name: String(body.name ?? "").trim(),
-    country: String(body.country ?? "").trim() || "Unknown",
+    country: String(body.country ?? "").trim(),
     plan: body.plan === "translation" ? "translation" : "basic",
     websiteUrl: String(body.websiteUrl ?? "").trim() || undefined,
     publicContactEmail: String(body.publicContactEmail ?? body.contactEmail ?? "").trim() || undefined,
@@ -42,9 +42,9 @@ function toCompany(body: Record<string, unknown>): Company {
     summaryJa: String(body.summaryJa ?? "").trim() || undefined,
     services,
     portfolioProjects: Array.isArray(body.portfolioProjects) ? (body.portfolioProjects as Company["portfolioProjects"]) : [],
-    minRate: Number(body.minRate ?? 20),
-    maxRate: Number(body.maxRate ?? 40),
-    teamSize: Number(body.teamSize ?? 10),
+    minRate: Number(body.minRate ?? 0),
+    maxRate: Number(body.maxRate ?? 0),
+    teamSize: Number(body.teamSize ?? 0),
     english: (body.english as Company["english"]) ?? "basic",
     japaneseSupport: (body.japaneseSupport as Company["japaneseSupport"]) ?? "basic"
   };
@@ -70,15 +70,36 @@ export async function PATCH(request: Request) {
   if (!body) return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
 
   const company = toCompany(body as Record<string, unknown>);
-  if (!company.name || !company.summary) {
-    return NextResponse.json({ error: "会社名と会社紹介は必須です。" }, { status: 400 });
+  const contactName = String(body.contactName ?? "").trim();
+  const contactEmail = String(body.contactEmail ?? user.email ?? "").trim().toLowerCase();
+  const invalidPortfolioProject = company.portfolioProjects.some((project) => (
+    !project.title?.trim()
+    || !project.durationLabel?.trim()
+    || !project.budgetLabel?.trim()
+    || !project.summary?.trim()
+    || !project.businessImpact?.trim()
+    || !project.technologies?.length
+  ));
+  if (
+    !company.name
+    || !company.country
+    || !contactName
+    || !/^\S+@\S+\.\S+$/.test(contactEmail)
+    || !company.summary
+    || company.services.length === 0
+    || !Number.isFinite(company.minRate) || company.minRate <= 0
+    || !Number.isFinite(company.maxRate) || company.maxRate < company.minRate
+    || !Number.isFinite(company.teamSize) || company.teamSize < 1
+    || invalidPortfolioProject
+  ) {
+    return NextResponse.json({ error: "必須項目をすべて正しく入力してください。" }, { status: 400 });
   }
 
   const application = await updateVendorApplicationByUserId({
     userId: user.id,
     company,
-    contactName: String(body.contactName ?? "").trim(),
-    contactEmail: String(body.contactEmail ?? user.email ?? "").trim().toLowerCase(),
+    contactName,
+    contactEmail,
     termsAcceptedAt: body.acceptedTerms ? new Date().toISOString() : undefined,
     termsVersion: body.acceptedTerms ? TERMS_VERSION : undefined
   });
