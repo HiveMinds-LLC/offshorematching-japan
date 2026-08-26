@@ -5362,12 +5362,12 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                           </Button>
                         </div>
                       </div>
-                      <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="grid items-start gap-3 sm:grid-cols-2">
                         <Field label={locale === "ja" ? "案件名" : "Project Name"} hint={portfolioDraftIssues.title} invalid={Boolean(portfolioDraftIssues.title)}>
                           <Input required aria-invalid={Boolean(portfolioDraftIssues.title)} className={portfolioDraftIssues.title ? "border-rose-400 bg-rose-50/40" : undefined} value={portfolioDraft.title} onChange={(e) => updatePortfolioDraft({ title: e.target.value })} />
                         </Field>
                         <Field label={locale === "ja" ? "実績カテゴリ" : "Project Category"}>
-                          <select className="select-field h-[38px] py-0" value={portfolioDraft.projectType} onChange={(e) => updatePortfolioDraft({ projectType: e.target.value as PortfolioProject["projectType"] })}>
+                          <select className="select-field h-[38px] py-0 pr-10" value={portfolioDraft.projectType} onChange={(e) => updatePortfolioDraft({ projectType: e.target.value as PortfolioProject["projectType"] })}>
                             {PROJECT_FILTER_OPTIONS.map((option) => (
                               <option key={option} value={option}>{projectTypeLabel(option, locale)}</option>
                             ))}
