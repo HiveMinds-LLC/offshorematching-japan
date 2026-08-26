@@ -44,6 +44,10 @@ type ChatMessage = {
   createdAt: string;
 };
 
+type PendingCompanyThumbnail =
+  | { kind: "upload"; detailFile: File; cardFile: File; previewUrl: string }
+  | { kind: "remove" };
+
 type SupabaseSessionPayload = {
   accessToken: string;
   refreshToken: string;
@@ -628,6 +632,7 @@ export function OffshoreMatchApp({
   const [vendorProfileMessage, setVendorProfileMessage] = useState("");
   const [vendorProfileSaving, setVendorProfileSaving] = useState(false);
   const [companyThumbnailLoading, setCompanyThumbnailLoading] = useState(false);
+  const [pendingCompanyThumbnail, setPendingCompanyThumbnail] = useState<PendingCompanyThumbnail | null>(null);
   const [editingPortfolioProjectId, setEditingPortfolioProjectId] = useState("");
   const [portfolioDraft, setPortfolioDraft] = useState<PortfolioProject | null>(null);
   const [portfolioTechnologiesInput, setPortfolioTechnologiesInput] = useState("");
@@ -1438,6 +1443,12 @@ export function OffshoreMatchApp({
     }
   }, [activeVendorCompany, currentVendorApplication, vendorProfileEditing]);
 
+  useEffect(() => {
+    return () => {
+      if (pendingCompanyThumbnail?.kind === "upload") URL.revokeObjectURL(pendingCompanyThumbnail.previewUrl);
+    };
+  }, [pendingCompanyThumbnail]);
+
   const visibleSections = useMemo(() => {
     const guestSections: Array<{ key: AppSectionKey; label: string }> = [
       { key: "marketplace", label: locale === "ja" ? "マーケットプレイス" : "Marketplace" },
@@ -1838,6 +1849,11 @@ export function OffshoreMatchApp({
   const vendorBillingNeedsRecovery = sessionRole === "vendor" && vendorBilling?.status === "canceled";
   const vendorProfileReadyForPublishing = isVendorProfileReadyForPublishing(activeVendorCompany);
   const vendorIsPublished = Boolean(activeVendorCompany?.active && vendorBillingActive);
+  const editableThumbnailUrl = pendingCompanyThumbnail?.kind === "upload"
+    ? pendingCompanyThumbnail.previewUrl
+    : pendingCompanyThumbnail?.kind === "remove"
+      ? undefined
+      : activeVendorCompany?.thumbnailUrl;
   const effectiveVendorPlan = normalizePlan(vendorBilling?.plan ?? activeVendorCompany?.plan);
   const logoutLoading = buyerLogoutLoading || vendorLogoutLoading || adminLogoutLoading;
   const vendorOnStandardPlan = vendorBilling?.plan === "basic" || (!vendorBilling && activeVendorCompany?.plan === "basic");
@@ -2215,50 +2231,6 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
       return false;
     }
 
-    if (currentVendorApplication && !vendorIsPublished) {
-      const response = await readJson<{ application: VendorApplication }>("/api/vendors/me/application", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: nextForm.name,
-          country: nextForm.country,
-          contactName: nextForm.contactName,
-          contactEmail: nextForm.contactEmail,
-          plan: nextForm.plan,
-          websiteUrl: nextForm.websiteUrl,
-          publicContactEmail: nextForm.publicContactEmail,
-          publicContactPhone: nextForm.publicContactPhone,
-          preferredLanguage: nextForm.preferredLanguage,
-          summary: nextForm.summary,
-          summaryJa: nextForm.summaryJa,
-          servicesCsv: nextForm.servicesCsv,
-          minRate: nextForm.minRate,
-          maxRate: nextForm.maxRate,
-          teamSize: nextForm.teamSize,
-          english: nextForm.english,
-          japaneseSupport: nextForm.japaneseSupport,
-          portfolioProjects: nextForm.portfolioProjects
-        })
-      });
-      if (!response.ok || !response.data) {
-        setVendorProfileMessage(response.error ?? "更新に失敗しました。");
-        return false;
-      }
-      setCurrentVendorApplication(response.data.application);
-      setActiveVendorCompany(response.data.application.company);
-      setVendorProfileForm(buildVendorProfileForm(response.data.application.company, response.data.application));
-      setVendorProfileMessage(
-        vendorBillingActive
-          ? (locale === "ja" ? "プロフィールを更新しました。掲載状態を確認してください。" : "Profile updated. Please check your listing status.")
-          : (locale === "ja" ? "プロフィール下書きを更新しました。" : "Profile draft updated.")
-      );
-      setVendorProfileEditing(false);
-      setEditingPortfolioProjectId("");
-      setPortfolioDraft(null);
-      await Promise.all([refreshVendorApplication(), refreshCompanies()]);
-      return true;
-    }
-
     const response = await readJson<{ company: Company }>(`/api/vendors/companies/${activeVendorCompany.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -2276,17 +2248,47 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
       return [response.data!.company, ...prev];
     });
     setVendorProfileMessage(locale === "ja" ? "プロフィールを更新しました。" : "Profile updated.");
-    setVendorProfileEditing(false);
-    setEditingPortfolioProjectId("");
-    setPortfolioDraft(null);
     await Promise.all([refreshVendorApplication(), refreshCompanies()]);
     return true;
   }
 
   async function handleSaveVendorProfile() {
     setVendorProfileSaving(true);
+    setVendorProfileMessage("");
     try {
-      await persistVendorProfile();
+      const saved = await persistVendorProfile();
+      if (saved) {
+        if (pendingCompanyThumbnail) {
+          const formData = new FormData();
+          const imageResponse = pendingCompanyThumbnail.kind === "upload"
+            ? (() => {
+                formData.set("file", pendingCompanyThumbnail.detailFile);
+                formData.set("cardFile", pendingCompanyThumbnail.cardFile);
+                return fetch(`/api/vendors/companies/${activeVendorCompany?.id}/thumbnail`, { method: "POST", body: formData });
+              })()
+            : fetch(`/api/vendors/companies/${activeVendorCompany?.id}/thumbnail`, { method: "DELETE" });
+          const response = await imageResponse;
+          const payload = await response.json().catch(() => ({})) as { company?: Company; error?: string };
+          if (!response.ok || !payload.company) {
+            const message = payload.error ?? (locale === "ja" ? "プロフィールは保存されましたが、会社画像を更新できませんでした。" : "Profile saved, but the company image could not be updated.");
+            setVendorProfileMessage(message);
+            toast({ tone: "error", title: message });
+            return;
+          }
+          applyThumbnailCompany(payload.company);
+          setPendingCompanyThumbnail(null);
+        }
+        setVendorProfileEditing(false);
+        setEditingPortfolioProjectId("");
+        setPortfolioDraft(null);
+        toast({ tone: "success", title: locale === "ja" ? "プロフィールを保存しました" : "Profile saved" });
+      } else {
+        toast({ tone: "error", title: locale === "ja" ? "プロフィールを保存できませんでした" : "Could not save profile" });
+      }
+    } catch {
+      const message = locale === "ja" ? "プロフィールの保存中にエラーが発生しました。" : "An error occurred while saving the profile.";
+      setVendorProfileMessage(message);
+      toast({ tone: "error", title: message });
     } finally {
       setVendorProfileSaving(false);
     }
@@ -2298,7 +2300,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
   }
 
   async function handleCompanyThumbnailUpload(file?: File) {
-    if (!file || !activeVendorCompany) return;
+    if (!file) return;
     if (!COMPANY_THUMBNAIL_TYPES.has(file.type)) {
       setVendorProfileMessage(locale === "ja" ? "JPG、PNG、WebP形式の画像を選択してください。" : "Please select a JPG, PNG, or WebP image.");
       return;
@@ -2310,18 +2312,12 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
     setCompanyThumbnailLoading(true);
     setVendorProfileMessage("");
     try {
-      const [optimizedFile, cardFile] = await Promise.all([
+      const [detailFile, cardFile] = await Promise.all([
         optimizeCompanyThumbnail(file, COMPANY_THUMBNAIL_MAX_EDGE, COMPANY_THUMBNAIL_TARGET_SIZE),
         optimizeCompanyThumbnail(file, 640, COMPANY_THUMBNAIL_CARD_TARGET_SIZE, true)
       ]);
-      const formData = new FormData();
-      formData.set("file", optimizedFile);
-      formData.set("cardFile", cardFile);
-      const response = await fetch(`/api/vendors/companies/${activeVendorCompany.id}/thumbnail`, { method: "POST", body: formData });
-      const payload = await response.json().catch(() => ({})) as { company?: Company; error?: string };
-      if (!response.ok || !payload.company) throw new Error(payload.error ?? "画像のアップロードに失敗しました。");
-      applyThumbnailCompany(payload.company);
-      toast({ tone: "success", title: locale === "ja" ? "会社画像を更新しました" : "Company image updated" });
+      setPendingCompanyThumbnail({ kind: "upload", detailFile, cardFile, previewUrl: URL.createObjectURL(detailFile) });
+      setVendorProfileMessage(locale === "ja" ? "会社画像を変更しました。プロフィールを保存すると反映されます。" : "Company image changed. Save the profile to apply it.");
     } catch (error) {
       setVendorProfileMessage(error instanceof Error ? error.message : (locale === "ja" ? "画像のアップロードに失敗しました。" : "Could not upload the image."));
     } finally {
@@ -2329,21 +2325,10 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
     }
   }
 
-  async function handleCompanyThumbnailDelete() {
-    if (!activeVendorCompany) return;
-    setCompanyThumbnailLoading(true);
+  function handleCompanyThumbnailDelete() {
     setVendorProfileMessage("");
-    try {
-      const response = await fetch(`/api/vendors/companies/${activeVendorCompany.id}/thumbnail`, { method: "DELETE" });
-      const payload = await response.json().catch(() => ({})) as { company?: Company; error?: string };
-      if (!response.ok || !payload.company) throw new Error(payload.error ?? "画像の削除に失敗しました。");
-      applyThumbnailCompany(payload.company);
-      toast({ tone: "info", title: locale === "ja" ? "会社画像を削除しました" : "Company image removed" });
-    } catch (error) {
-      setVendorProfileMessage(error instanceof Error ? error.message : (locale === "ja" ? "画像の削除に失敗しました。" : "Could not remove the image."));
-    } finally {
-      setCompanyThumbnailLoading(false);
-    }
+    setPendingCompanyThumbnail({ kind: "remove" });
+    setVendorProfileMessage(locale === "ja" ? "会社画像を削除するよう変更しました。プロフィールを保存すると反映されます。" : "Company image will be removed when you save the profile.");
   }
 
   async function handleTranslateVendorProfile() {
@@ -2514,6 +2499,9 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
       const saved = await persistVendorProfile(nextForm);
       if (!saved) return;
       setPortfolioTechnologiesInput("");
+      setEditingPortfolioProjectId("");
+      setPortfolioDraft(null);
+      toast({ tone: "success", title: locale === "ja" ? "実績を保存しました" : "Project saved" });
     } finally {
       setPortfolioSaving(false);
     }
@@ -4594,6 +4582,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                             disabled={vendorProfileSaving}
                             onClick={() => {
                               setVendorProfileForm(buildVendorProfileForm(activeVendorCompany, currentVendorApplication));
+                              setPendingCompanyThumbnail(null);
                               setVendorProfileMessage("");
                               setProfileTranslationMessage("");
                               setVendorProfileEditing(false);
@@ -4700,9 +4689,9 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                             <p className="text-sm font-semibold text-slate-900">{locale === "ja" ? "会社画像" : "Company Image"}</p>
                             <p className="mt-1 text-sm text-slate-600">{locale === "ja" ? "掲載企業情報と公開プロフィールに表示されます。JPG、PNG、WebP形式。アップロード時に軽量なWebPへ最適化します。" : "Shown on your listing and public profile. JPG, PNG, and WebP are optimized into a lightweight WebP before upload."}</p>
                           </div>
-                          {activeVendorCompany?.thumbnailUrl ? (
+                          {editableThumbnailUrl ? (
                             <div className="company-thumbnail-preview relative h-24 w-40 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                              <img src={activeVendorCompany.thumbnailUrl} alt={locale === "ja" ? `${activeVendorCompany.name}の会社画像` : `${activeVendorCompany.name} company image`} className="h-full w-full object-cover" />
+                              <img src={editableThumbnailUrl} alt={locale === "ja" ? `${activeVendorCompany?.name ?? ""}の会社画像` : `${activeVendorCompany?.name ?? ""} company image`} className="h-full w-full object-cover" />
                               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/35 to-transparent" />
                             </div>
                           ) : (
@@ -4714,7 +4703,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                         </div>
                         <div className="mt-4 flex flex-wrap items-center gap-2">
                           <label className="company-thumbnail-upload-button inline-flex cursor-pointer items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
-                            <span>{companyThumbnailLoading ? (locale === "ja" ? "アップロード中..." : "Uploading...") : activeVendorCompany?.thumbnailUrl ? (locale === "ja" ? "画像を変更" : "Replace Image") : (locale === "ja" ? "画像をアップロード" : "Upload Image")}</span>
+                            <span>{companyThumbnailLoading ? (locale === "ja" ? "画像を最適化中..." : "Optimizing image...") : editableThumbnailUrl ? (locale === "ja" ? "画像を変更" : "Replace Image") : (locale === "ja" ? "画像をアップロード" : "Upload Image")}</span>
                             <input
                               type="file"
                               accept="image/jpeg,image/png,image/webp"
@@ -4726,8 +4715,8 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                               }}
                             />
                           </label>
-                          {activeVendorCompany?.thumbnailUrl ? (
-                            <Button variant="ghost" disabled={companyThumbnailLoading} onClick={() => void handleCompanyThumbnailDelete()}>
+                          {editableThumbnailUrl ? (
+                            <Button variant="ghost" disabled={companyThumbnailLoading} onClick={handleCompanyThumbnailDelete}>
                               {locale === "ja" ? "画像を削除" : "Remove Image"}
                             </Button>
                           ) : null}
