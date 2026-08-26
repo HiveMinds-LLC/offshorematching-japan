@@ -42,6 +42,7 @@ export default function VendorRegisterPage() {
   const [form, setForm] = useState<VendorSignupForm>(defaults);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
+  const [stepOneAttempted, setStepOneAttempted] = useState(false);
   const [awaitingEmailConfirmation, setAwaitingEmailConfirmation] = useState(false);
 
   const selectedPlan = useMemo(
@@ -67,6 +68,7 @@ export default function VendorRegisterPage() {
   );
 
   function validateStepOne() {
+    setStepOneAttempted(true);
     if (!form.name || !form.contactName || !form.contactEmail || !form.password) {
       toast({
         tone: "error",
@@ -216,24 +218,24 @@ export default function VendorRegisterPage() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="grid gap-1.5">
-                  <span className="field-label">{locale === "ja" ? "会社名" : "Company Name"}</span>
-                  <Input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+                  <span className="field-label">{locale === "ja" ? "会社名" : "Company Name"} <span className="text-rose-500">*</span></span>
+                  <Input required aria-invalid={stepOneAttempted && !form.name.trim()} className={stepOneAttempted && !form.name.trim() ? "border-rose-400 bg-rose-50/40" : undefined} value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
                 </label>
                 <label className="grid gap-1.5">
                   <span className="field-label">{locale === "ja" ? "国" : "Country"}</span>
                   <Input value={form.country} onChange={(e) => setForm((p) => ({ ...p, country: e.target.value }))} />
                 </label>
                 <label className="grid gap-1.5">
-                  <span className="field-label">{locale === "ja" ? "担当者名" : "Contact Name"}</span>
-                  <Input value={form.contactName} onChange={(e) => setForm((p) => ({ ...p, contactName: e.target.value }))} />
+                  <span className="field-label">{locale === "ja" ? "担当者名" : "Contact Name"} <span className="text-rose-500">*</span></span>
+                  <Input required aria-invalid={stepOneAttempted && !form.contactName.trim()} className={stepOneAttempted && !form.contactName.trim() ? "border-rose-400 bg-rose-50/40" : undefined} value={form.contactName} onChange={(e) => setForm((p) => ({ ...p, contactName: e.target.value }))} />
                 </label>
                 <label className="grid gap-1.5">
-                  <span className="field-label">{locale === "ja" ? "連絡先メール" : "Contact Email"}</span>
-                  <Input value={form.contactEmail} onChange={(e) => setForm((p) => ({ ...p, contactEmail: e.target.value }))} />
+                  <span className="field-label">{locale === "ja" ? "連絡先メール" : "Contact Email"} <span className="text-rose-500">*</span></span>
+                  <Input type="email" required aria-invalid={stepOneAttempted && !/^\S+@\S+\.\S+$/.test(form.contactEmail)} className={stepOneAttempted && !/^\S+@\S+\.\S+$/.test(form.contactEmail) ? "border-rose-400 bg-rose-50/40" : undefined} value={form.contactEmail} onChange={(e) => setForm((p) => ({ ...p, contactEmail: e.target.value }))} />
                 </label>
                 <label className="grid gap-1.5 sm:col-span-2">
-                  <span className="field-label">{locale === "ja" ? "パスワード" : "Password"}</span>
-                  <PasswordInput value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
+                  <span className="field-label">{locale === "ja" ? "パスワード" : "Password"} <span className="text-rose-500">*</span></span>
+                  <PasswordInput required aria-invalid={stepOneAttempted && (form.password.length < 8 || !/\d/.test(form.password))} className={stepOneAttempted && (form.password.length < 8 || !/\d/.test(form.password)) ? "border-rose-400 bg-rose-50/40" : undefined} value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
                   <span className="text-xs text-slate-500">{locale === "ja" ? "ログインに使う必須パスワードです。8文字以上かつ数字を1つ以上含めてください。" : "This password will be used for sign-in. Use at least 8 characters and include at least 1 number."}</span>
                 </label>
               </div>
