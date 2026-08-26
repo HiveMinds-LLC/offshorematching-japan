@@ -18,11 +18,12 @@ export async function POST(request: Request) {
   const country = String(body.country ?? "").trim();
   const accessEndsAt = String(body.accessEndsAt ?? "").trim();
 
-  if (!companyName || !contactName || !email || password.length < 8) {
+  if (!companyName || !contactName || !/^\S+@\S+\.\S+$/.test(email) || password.length < 8) {
     return NextResponse.json({ error: "会社名・担当者名・メール・8文字以上のパスワードを入力してください。" }, { status: 400 });
   }
-  if (!accessEndsAt || Number.isNaN(Date.parse(accessEndsAt))) {
-    return NextResponse.json({ error: "有効な利用終了日を入力してください。" }, { status: 400 });
+  const accessEndsAtTime = Date.parse(accessEndsAt);
+  if (!accessEndsAt || Number.isNaN(accessEndsAtTime) || accessEndsAtTime <= Date.now()) {
+    return NextResponse.json({ error: "未来の有効な利用終了日を入力してください。" }, { status: 400 });
   }
 
   const result = await adminCreateVendorAccount({ companyName, contactName, email, password, plan, country, accessEndsAt });

@@ -449,10 +449,12 @@ export function AdminReviewPanel({
             <label className="grid gap-1.5">
               <span className="field-label">{locale === "en" ? "Admin Email" : "管理者メール"}</span>
               <Input required type="email" aria-invalid={adminLoginAttempted && !isEmail(adminEmail)} className={adminLoginAttempted && !isEmail(adminEmail) ? "border-rose-400 bg-rose-50/40" : undefined} value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} />
+              {adminLoginAttempted && !isEmail(adminEmail) ? <span className="text-xs text-rose-600">{locale === "en" ? "Enter a valid email address." : "有効なメールアドレスを入力してください。"}</span> : null}
             </label>
             <label className="grid gap-1.5">
               <span className="field-label">{locale === "en" ? "Password" : "パスワード"}</span>
               <PasswordInput required aria-invalid={adminLoginAttempted && !adminPassword} className={adminLoginAttempted && !adminPassword ? "border-rose-400 bg-rose-50/40" : undefined} value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} />
+              {adminLoginAttempted && !adminPassword ? <span className="text-xs text-rose-600">{locale === "en" ? "Enter your password." : "パスワードを入力してください。"}</span> : null}
             </label>
             <div className="self-end">
               <Button className="w-full" onClick={() => void handleAdminLogin()} disabled={loginLoading}>
@@ -826,11 +828,13 @@ export function AdminReviewPanel({
                   <label className="grid gap-1.5">
                     <span className="field-label">{locale === "en" ? "Company Name" : "会社名"} <span className="text-rose-500">*</span></span>
                     <Input required aria-invalid={vendorFieldInvalid.companyName} className={vendorFieldInvalid.companyName ? "border-rose-400 bg-rose-50/40" : undefined} value={newVendorForm.companyName} onChange={(e) => setNewVendorForm((p) => ({ ...p, companyName: e.target.value }))} placeholder="Acme Development Inc." />
+                    {vendorFieldInvalid.companyName ? <span className="text-xs text-rose-600">{locale === "en" ? "Enter a company name." : "会社名を入力してください。"}</span> : null}
                   </label>
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="grid gap-1.5">
                       <span className="field-label">{locale === "en" ? "Contact Name" : "担当者名"} <span className="text-rose-500">*</span></span>
                       <Input required aria-invalid={vendorFieldInvalid.contactName} className={vendorFieldInvalid.contactName ? "border-rose-400 bg-rose-50/40" : undefined} value={newVendorForm.contactName} onChange={(e) => setNewVendorForm((p) => ({ ...p, contactName: e.target.value }))} placeholder={locale === "en" ? "Taro Yamada" : "山田 太郎"} />
+                      {vendorFieldInvalid.contactName ? <span className="text-xs text-rose-600">{locale === "en" ? "Enter a contact name." : "担当者名を入力してください。"}</span> : null}
                     </label>
                     <label className="grid gap-1.5">
                       <span className="field-label">{locale === "en" ? "Country" : "国"}</span>
@@ -840,10 +844,12 @@ export function AdminReviewPanel({
                   <label className="grid gap-1.5">
                     <span className="field-label">{locale === "en" ? "Login Email" : "ログインメール"} <span className="text-rose-500">*</span></span>
                     <Input required type="email" aria-invalid={vendorFieldInvalid.email} className={vendorFieldInvalid.email ? "border-rose-400 bg-rose-50/40" : undefined} value={newVendorForm.email} onChange={(e) => setNewVendorForm((p) => ({ ...p, email: e.target.value }))} placeholder="vendor@example.com" />
+                    {vendorFieldInvalid.email ? <span className="text-xs text-rose-600">{locale === "en" ? "Enter a valid email address." : "有効なメールアドレスを入力してください。"}</span> : null}
                   </label>
                   <label className="grid gap-1.5">
                     <span className="field-label">{locale === "en" ? "Initial Password (min 8 chars)" : "初期パスワード（8文字以上）"} <span className="text-rose-500">*</span></span>
                     <PasswordInput required aria-invalid={vendorFieldInvalid.password} className={vendorFieldInvalid.password ? "border-rose-400 bg-rose-50/40" : undefined} value={newVendorForm.password} onChange={(e) => setNewVendorForm((p) => ({ ...p, password: e.target.value }))} />
+                    {vendorFieldInvalid.password ? <span className="text-xs text-rose-600">{locale === "en" ? "Use at least 8 characters." : "8文字以上で入力してください。"}</span> : null}
                   </label>
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="grid gap-1.5">
@@ -856,6 +862,7 @@ export function AdminReviewPanel({
                     <label className="grid gap-1.5">
                       <span className="field-label">{locale === "en" ? "Access End Date" : "利用終了日"} <span className="text-rose-500">*</span></span>
                       <Input required type="date" aria-invalid={vendorFieldInvalid.accessEndsAt} className={vendorFieldInvalid.accessEndsAt ? "border-rose-400 bg-rose-50/40" : undefined} value={newVendorForm.accessEndsAt} onChange={(e) => setNewVendorForm((p) => ({ ...p, accessEndsAt: e.target.value }))} />
+                      {vendorFieldInvalid.accessEndsAt ? <span className="text-xs text-rose-600">{locale === "en" ? "Choose a future date." : "未来の日付を設定してください。"}</span> : null}
                     </label>
                   </div>
                 </div>
@@ -885,11 +892,13 @@ export function AdminReviewPanel({
                   <label className="grid gap-1.5">
                     <span className="field-label">{locale === "en" ? "Company Name" : "会社名"} <span className="text-rose-500">*</span></span>
                     <Input required aria-invalid={buyerFieldInvalid.companyName} className={buyerFieldInvalid.companyName ? "border-rose-400 bg-rose-50/40" : undefined} value={newBuyerForm.companyName} onChange={(e) => setNewBuyerForm((p) => ({ ...p, companyName: e.target.value }))} placeholder={locale === "en" ? "Sample Corp." : "株式会社サンプル"} />
+                    {buyerFieldInvalid.companyName ? <span className="text-xs text-rose-600">{locale === "en" ? "Enter a company name." : "会社名を入力してください。"}</span> : null}
                   </label>
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="grid gap-1.5">
                       <span className="field-label">{locale === "en" ? "Contact Name" : "担当者名"} <span className="text-rose-500">*</span></span>
                       <Input required aria-invalid={buyerFieldInvalid.contactName} className={buyerFieldInvalid.contactName ? "border-rose-400 bg-rose-50/40" : undefined} value={newBuyerForm.contactName} onChange={(e) => setNewBuyerForm((p) => ({ ...p, contactName: e.target.value }))} placeholder={locale === "en" ? "Hanako Suzuki" : "鈴木 花子"} />
+                      {buyerFieldInvalid.contactName ? <span className="text-xs text-rose-600">{locale === "en" ? "Enter a contact name." : "担当者名を入力してください。"}</span> : null}
                     </label>
                     <label className="grid gap-1.5">
                       <span className="field-label">{locale === "en" ? "Industry" : "業種"}</span>
@@ -899,10 +908,12 @@ export function AdminReviewPanel({
                   <label className="grid gap-1.5">
                     <span className="field-label">{locale === "en" ? "Login Email" : "ログインメール"} <span className="text-rose-500">*</span></span>
                     <Input required type="email" aria-invalid={buyerFieldInvalid.email} className={buyerFieldInvalid.email ? "border-rose-400 bg-rose-50/40" : undefined} value={newBuyerForm.email} onChange={(e) => setNewBuyerForm((p) => ({ ...p, email: e.target.value }))} placeholder="buyer@example.co.jp" />
+                    {buyerFieldInvalid.email ? <span className="text-xs text-rose-600">{locale === "en" ? "Enter a valid email address." : "有効なメールアドレスを入力してください。"}</span> : null}
                   </label>
                   <label className="grid gap-1.5">
                     <span className="field-label">{locale === "en" ? "Initial Password (min 8 chars)" : "初期パスワード（8文字以上）"} <span className="text-rose-500">*</span></span>
                     <PasswordInput required aria-invalid={buyerFieldInvalid.password} className={buyerFieldInvalid.password ? "border-rose-400 bg-rose-50/40" : undefined} value={newBuyerForm.password} onChange={(e) => setNewBuyerForm((p) => ({ ...p, password: e.target.value }))} />
+                    {buyerFieldInvalid.password ? <span className="text-xs text-rose-600">{locale === "en" ? "Use at least 8 characters." : "8文字以上で入力してください。"}</span> : null}
                   </label>
                   <p className="text-xs text-slate-500">
                     {locale === "en"

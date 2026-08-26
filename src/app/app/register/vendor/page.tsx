@@ -43,7 +43,15 @@ export default function VendorRegisterPage() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
   const [stepOneAttempted, setStepOneAttempted] = useState(false);
+  const [termsAttempted, setTermsAttempted] = useState(false);
   const [awaitingEmailConfirmation, setAwaitingEmailConfirmation] = useState(false);
+
+  const stepOneInvalid = {
+    name: !form.name.trim(),
+    contactName: !form.contactName.trim(),
+    contactEmail: !/^\S+@\S+\.\S+$/.test(form.contactEmail),
+    password: form.password.length < 8 || !/\d/.test(form.password)
+  };
 
   const selectedPlan = useMemo(
     () =>
@@ -89,6 +97,7 @@ export default function VendorRegisterPage() {
   }
 
   function validateStepTwo() {
+    setTermsAttempted(true);
     if (!form.acceptedTerms) {
       toast({
         tone: "error",
@@ -219,7 +228,8 @@ export default function VendorRegisterPage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="grid gap-1.5">
                   <span className="field-label">{locale === "ja" ? "会社名" : "Company Name"} <span className="text-rose-500">*</span></span>
-                  <Input required aria-invalid={stepOneAttempted && !form.name.trim()} className={stepOneAttempted && !form.name.trim() ? "border-rose-400 bg-rose-50/40" : undefined} value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+                  <Input required aria-invalid={stepOneAttempted && stepOneInvalid.name} className={stepOneAttempted && stepOneInvalid.name ? "border-rose-400 bg-rose-50/40" : undefined} value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+                  {stepOneAttempted && stepOneInvalid.name ? <span className="text-xs text-rose-600">{locale === "ja" ? "会社名を入力してください。" : "Enter your company name."}</span> : null}
                 </label>
                 <label className="grid gap-1.5">
                   <span className="field-label">{locale === "ja" ? "国" : "Country"}</span>
@@ -227,16 +237,19 @@ export default function VendorRegisterPage() {
                 </label>
                 <label className="grid gap-1.5">
                   <span className="field-label">{locale === "ja" ? "担当者名" : "Contact Name"} <span className="text-rose-500">*</span></span>
-                  <Input required aria-invalid={stepOneAttempted && !form.contactName.trim()} className={stepOneAttempted && !form.contactName.trim() ? "border-rose-400 bg-rose-50/40" : undefined} value={form.contactName} onChange={(e) => setForm((p) => ({ ...p, contactName: e.target.value }))} />
+                  <Input required aria-invalid={stepOneAttempted && stepOneInvalid.contactName} className={stepOneAttempted && stepOneInvalid.contactName ? "border-rose-400 bg-rose-50/40" : undefined} value={form.contactName} onChange={(e) => setForm((p) => ({ ...p, contactName: e.target.value }))} />
+                  {stepOneAttempted && stepOneInvalid.contactName ? <span className="text-xs text-rose-600">{locale === "ja" ? "担当者名を入力してください。" : "Enter a contact name."}</span> : null}
                 </label>
                 <label className="grid gap-1.5">
                   <span className="field-label">{locale === "ja" ? "連絡先メール" : "Contact Email"} <span className="text-rose-500">*</span></span>
-                  <Input type="email" required aria-invalid={stepOneAttempted && !/^\S+@\S+\.\S+$/.test(form.contactEmail)} className={stepOneAttempted && !/^\S+@\S+\.\S+$/.test(form.contactEmail) ? "border-rose-400 bg-rose-50/40" : undefined} value={form.contactEmail} onChange={(e) => setForm((p) => ({ ...p, contactEmail: e.target.value }))} />
+                  <Input type="email" required aria-invalid={stepOneAttempted && stepOneInvalid.contactEmail} className={stepOneAttempted && stepOneInvalid.contactEmail ? "border-rose-400 bg-rose-50/40" : undefined} value={form.contactEmail} onChange={(e) => setForm((p) => ({ ...p, contactEmail: e.target.value }))} />
+                  {stepOneAttempted && stepOneInvalid.contactEmail ? <span className="text-xs text-rose-600">{locale === "ja" ? "有効なメールアドレスを入力してください。" : "Enter a valid email address."}</span> : null}
                 </label>
                 <label className="grid gap-1.5 sm:col-span-2">
                   <span className="field-label">{locale === "ja" ? "パスワード" : "Password"} <span className="text-rose-500">*</span></span>
-                  <PasswordInput required aria-invalid={stepOneAttempted && (form.password.length < 8 || !/\d/.test(form.password))} className={stepOneAttempted && (form.password.length < 8 || !/\d/.test(form.password)) ? "border-rose-400 bg-rose-50/40" : undefined} value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
+                  <PasswordInput required aria-invalid={stepOneAttempted && stepOneInvalid.password} className={stepOneAttempted && stepOneInvalid.password ? "border-rose-400 bg-rose-50/40" : undefined} value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
                   <span className="text-xs text-slate-500">{locale === "ja" ? "ログインに使う必須パスワードです。8文字以上かつ数字を1つ以上含めてください。" : "This password will be used for sign-in. Use at least 8 characters and include at least 1 number."}</span>
+                  {stepOneAttempted && stepOneInvalid.password ? <span className="text-xs text-rose-600">{locale === "ja" ? "パスワードは8文字以上で、数字を1つ以上含めてください。" : "Use at least 8 characters and include a number."}</span> : null}
                 </label>
               </div>
               <div className="flex justify-end">
@@ -330,7 +343,7 @@ export default function VendorRegisterPage() {
                 </ol>
               </div>
 
-              <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+              <label className={`flex items-start gap-3 rounded-2xl border bg-white p-4 ${termsAttempted && !form.acceptedTerms ? "border-rose-400 bg-rose-50/40" : "border-slate-200"}`}>
                 <input
                   type="checkbox"
                   className="mt-1 h-4 w-4 rounded border-slate-300"
@@ -345,6 +358,7 @@ export default function VendorRegisterPage() {
                     ? <>、および <span className="font-semibold">{form.plan === "translation" ? "月額 ¥10,000" : "月額 ¥5,000"}</span> の定期課金に同意します。</>
                     : <> and the recurring billing of <span className="font-semibold">{form.plan === "translation" ? "JPY 10,000 / month" : "JPY 5,000 / month"}</span>.</>}
                   <span className="mt-1 block text-xs text-slate-500">Terms version: {TERMS_VERSION}</span>
+                  {termsAttempted && !form.acceptedTerms ? <span className="mt-1 block text-xs text-rose-600">{locale === "ja" ? "利用規約と定期課金への同意が必要です。" : "You must agree to the terms and recurring billing."}</span> : null}
                 </span>
               </label>
 

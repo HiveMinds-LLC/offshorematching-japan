@@ -121,6 +121,7 @@ export default function BuyerRegisterPage() {
             <span className="text-xs leading-6 text-slate-500">
               {locale === "ja" ? "8文字以上で、数字を1つ以上含めてください。ログイン時にもこのパスワードを使用します。" : "At least 8 characters including one number. You will use this password to log in."}
             </span>
+            {attempted && invalid.password ? <span className="text-xs text-rose-600">{locale === "ja" ? "パスワードは8文字以上で、数字を1つ以上含めてください。" : "Use at least 8 characters and include a number."}</span> : null}
           </label>
 
           <div className="flex flex-wrap gap-2">
