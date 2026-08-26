@@ -69,11 +69,11 @@ export default function VendorRegisterPage() {
 
   function validateStepOne() {
     setStepOneAttempted(true);
-    if (!form.name || !form.contactName || !form.contactEmail || !form.password) {
+    if (!form.name.trim() || !form.contactName.trim() || !/^\S+@\S+\.\S+$/.test(form.contactEmail) || !form.password) {
       toast({
         tone: "error",
         title: locale === "ja" ? "基本情報を確認してください" : "Check the required details",
-        description: locale === "ja" ? "会社名・担当者名・連絡先メール・パスワードは必須です。" : "Company name, contact name, contact email, and password are required."
+        description: locale === "ja" ? "会社名・担当者名・有効な連絡先メール・パスワードを入力してください。" : "Enter a company name, contact name, valid contact email, and password."
       });
       return false;
     }

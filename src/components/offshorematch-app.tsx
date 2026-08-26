@@ -48,6 +48,17 @@ type PendingCompanyThumbnail =
   | { kind: "upload"; detailFile: File; cardFile: File; previewUrl: string }
   | { kind: "remove" };
 
+function getPortfolioDraftIssues(project: PortfolioProject, locale: "ja" | "en") {
+  const issues: Partial<Record<"title" | "duration" | "budget" | "summary" | "technologies" | "impact", string>> = {};
+  if (!project.title.trim()) issues.title = locale === "ja" ? "案件名を入力してください。" : "Enter a project name.";
+  if (!project.durationLabel.trim()) issues.duration = locale === "ja" ? "期間を入力してください。" : "Enter a timeline.";
+  if (!project.budgetLabel.trim()) issues.budget = locale === "ja" ? "予算目安を入力してください。" : "Enter a budget range.";
+  if (!project.summary.trim()) issues.summary = locale === "ja" ? "案件概要を入力してください。" : "Enter a project summary.";
+  if (!project.technologies.length) issues.technologies = locale === "ja" ? "技術スタックを1つ以上入力してください。" : "Add at least one technology.";
+  if (!project.businessImpact.trim()) issues.impact = locale === "ja" ? "成果・ビジネス効果を入力してください。" : "Enter an outcome or business impact.";
+  return issues;
+}
+
 type SupabaseSessionPayload = {
   accessToken: string;
   refreshToken: string;
@@ -660,6 +671,7 @@ export function OffshoreMatchApp({
   const [portfolioDraft, setPortfolioDraft] = useState<PortfolioProject | null>(null);
   const [portfolioTechnologiesInput, setPortfolioTechnologiesInput] = useState("");
   const [portfolioSaving, setPortfolioSaving] = useState(false);
+  const [portfolioSaveAttempted, setPortfolioSaveAttempted] = useState(false);
   const [portfolioDeletingId, setPortfolioDeletingId] = useState("");
   const [portfolioTranslationLoading, setPortfolioTranslationLoading] = useState(false);
   const [portfolioTranslationPreview, setPortfolioTranslationPreview] = useState<PortfolioProject | null>(null);
@@ -2279,6 +2291,11 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
       setVendorProfileMessage(locale === "ja" ? "会社プロフィールを読み込めませんでした。ページを再読み込みしてください。" : "Could not load the company profile. Please reload the page.");
       return false;
     }
+    const publishIssues = getVendorProfilePublishIssues(nextForm, locale);
+    if (publishIssues.length > 0) {
+      setVendorProfileMessage(locale === "ja" ? "必須項目を入力してから保存してください。" : "Complete the required fields before saving.");
+      return false;
+    }
 
     const response = await readJson<{ company: Company }>(`/api/vendors/companies/${activeVendorCompany.id}`, {
       method: "PATCH",
@@ -2330,16 +2347,17 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
         setVendorProfileEditing(false);
         setEditingPortfolioProjectId("");
         setPortfolioDraft(null);
-        const remainingIssues = getVendorProfilePublishIssues(vendorProfileForm, locale);
         toast({
-          tone: remainingIssues.length > 0 ? "info" : "success",
-          title: locale === "ja" ? "プロフィールを保存しました" : "Profile saved",
-          description: remainingIssues.length > 0
-            ? (locale === "ja" ? `下書きを保存しました。公開前に ${remainingIssues.length} 項目を確認してください。` : `Draft saved. Review ${remainingIssues.length} item${remainingIssues.length === 1 ? "" : "s"} before publishing.`)
-            : undefined
+          tone: "success",
+          title: locale === "ja" ? "プロフィールを保存しました" : "Profile saved"
         });
       } else {
-        toast({ tone: "error", title: locale === "ja" ? "プロフィールを保存できませんでした" : "Could not save profile" });
+        const issues = getVendorProfilePublishIssues(vendorProfileForm, locale);
+        toast({
+          tone: "error",
+          title: locale === "ja" ? "必須項目を入力してください" : "Complete the required fields",
+          description: issues.length ? issues.join(" ") : undefined
+        });
       }
     } catch {
       const message = locale === "ja" ? "プロフィールの保存中にエラーが発生しました。" : "An error occurred while saving the profile.";
@@ -2504,6 +2522,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
     setEditingPortfolioProjectId(nextProject.id);
     setPortfolioDraft(nextProject);
     setPortfolioTechnologiesInput("");
+    setPortfolioSaveAttempted(false);
   }
 
   async function removePortfolioProject(projectId: string) {
@@ -2529,6 +2548,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
     setEditingPortfolioProjectId(projectId);
     setPortfolioDraft({ ...project });
     setPortfolioTechnologiesInput(project.technologies.join(", "));
+    setPortfolioSaveAttempted(false);
   }
 
   function cancelPortfolioEditing() {
@@ -2539,6 +2559,12 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
 
   async function commitPortfolioDraft() {
     if (!portfolioDraft) return;
+    setPortfolioSaveAttempted(true);
+    const issues = getPortfolioDraftIssues(portfolioDraft, locale);
+    if (Object.keys(issues).length > 0) {
+      toast({ tone: "error", title: locale === "ja" ? "必須項目を入力してください" : "Complete the required fields" });
+      return;
+    }
     setPortfolioSaving(true);
     const nextProjects = (() => {
       const currentProjects = vendorProfileForm.portfolioProjects;
@@ -4741,8 +4767,8 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                     <>
                       {vendorProfilePublishIssues.length > 0 ? (
                         <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                          <p className="font-semibold">{locale === "ja" ? "公開前に入力が必要な項目" : "Required before publishing"}</p>
-                          <p className="mt-1 text-amber-800">{locale === "ja" ? "下書きとして保存できます。公開するには次の項目を入力してください。" : "You can save a draft now. Complete these items before the listing can go live."}</p>
+                          <p className="font-semibold">{locale === "ja" ? "保存前に入力が必要な項目" : "Required before saving"}</p>
+                          <p className="mt-1 text-amber-800">{locale === "ja" ? "次の項目を入力するとプロフィールを保存できます。" : "Complete these items before saving your profile."}</p>
                           <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-800">
                             {vendorProfilePublishIssues.map((issue) => <li key={issue}>{issue}</li>)}
                           </ul>
@@ -4792,7 +4818,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                         </div>
                       </div>
                       <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        <Field required label={locale === "ja" ? "会社名" : "Company Name"} hint={vendorProfileFieldInvalid.name ? (locale === "ja" ? "公開前に入力してください。" : "Required before publishing.") : undefined}>
+                        <Field label={locale === "ja" ? "会社名" : "Company Name"} hint={vendorProfileFieldInvalid.name ? (locale === "ja" ? "公開前に入力してください。" : "Required before publishing.") : undefined}>
                           <Input
                             value={vendorProfileForm.name}
                             onChange={(e) => setVendorProfileForm((p) => ({ ...p, name: e.target.value }))}
@@ -4801,7 +4827,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                             className={vendorProfileFieldInvalid.name ? "border-rose-400 bg-rose-50/40" : undefined}
                           />
                         </Field>
-                        <Field required label={locale === "ja" ? "国" : "Country"} hint={vendorProfileFieldInvalid.country ? (locale === "ja" ? "公開前に入力してください。" : "Required before publishing.") : undefined}>
+                        <Field label={locale === "ja" ? "国" : "Country"} hint={vendorProfileFieldInvalid.country ? (locale === "ja" ? "公開前に入力してください。" : "Required before publishing.") : undefined}>
                           <Input
                             value={vendorProfileForm.country}
                             onChange={(e) => setVendorProfileForm((p) => ({ ...p, country: e.target.value }))}
@@ -4810,7 +4836,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                             className={vendorProfileFieldInvalid.country ? "border-rose-400 bg-rose-50/40" : undefined}
                           />
                         </Field>
-                        <Field required label={locale === "ja" ? "担当者名" : "Contact Person"} hint={vendorProfileFieldInvalid.contactName ? (locale === "ja" ? "公開前に入力してください。" : "Required before publishing.") : undefined}>
+                        <Field label={locale === "ja" ? "担当者名" : "Contact Person"} hint={vendorProfileFieldInvalid.contactName ? (locale === "ja" ? "公開前に入力してください。" : "Required before publishing.") : undefined}>
                           <Input
                             value={vendorProfileForm.contactName}
                             onChange={(e) => setVendorProfileForm((p) => ({ ...p, contactName: e.target.value }))}
@@ -4870,7 +4896,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                             <option value="tl">Tagalog</option>
                           </select>
                         </Field>
-                        <Field required label={locale === "ja" ? "技術スタック（カンマ区切り）" : "Tech Stack (comma separated)"} hint={vendorProfileFieldInvalid.services ? (locale === "ja" ? "公開前に1つ以上入力してください。" : "Add at least one before publishing.") : (locale === "ja" ? "1つ以上入力してください。" : "Enter at least one technology.")}>
+                        <Field label={locale === "ja" ? "技術スタック（カンマ区切り）" : "Tech Stack (comma separated)"} hint={vendorProfileFieldInvalid.services ? (locale === "ja" ? "公開前に1つ以上入力してください。" : "Add at least one before publishing.") : (locale === "ja" ? "1つ以上入力してください。" : "Enter at least one technology.")}>
                           <Input
                             value={vendorProfileForm.servicesCsv}
                             onChange={(e) => setVendorProfileForm((p) => ({ ...p, servicesCsv: e.target.value }))}
@@ -4879,7 +4905,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                             className={vendorProfileFieldInvalid.services ? "border-rose-400 bg-rose-50/40" : undefined}
                           />
                         </Field>
-                        <Field required label={locale === "ja" ? "最低単価（円/時）" : "Minimum Rate (JPY/hr)"} hint={vendorProfileFieldInvalid.minRate ? (locale === "ja" ? "0より大きい金額を入力してください。" : "Enter an amount above zero.") : undefined}>
+                        <Field label={locale === "ja" ? "最低単価（円/時）" : "Minimum Rate (JPY/hr)"} hint={vendorProfileFieldInvalid.minRate ? (locale === "ja" ? "0より大きい金額を入力してください。" : "Enter an amount above zero.") : undefined}>
                           <Input
                             value={vendorProfileForm.minRate}
                             onChange={(e) => setVendorProfileForm((p) => ({ ...p, minRate: e.target.value }))}
@@ -4888,7 +4914,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                             className={vendorProfileFieldInvalid.minRate ? "border-rose-400 bg-rose-50/40" : undefined}
                           />
                         </Field>
-                        <Field required label={locale === "ja" ? "最高単価（円/時）" : "Maximum Rate (JPY/hr)"} hint={vendorProfileFieldInvalid.maxRate ? (locale === "ja" ? "最低単価以上にしてください。" : "Must be at least the minimum rate.") : undefined}>
+                        <Field label={locale === "ja" ? "最高単価（円/時）" : "Maximum Rate (JPY/hr)"} hint={vendorProfileFieldInvalid.maxRate ? (locale === "ja" ? "最低単価以上にしてください。" : "Must be at least the minimum rate.") : undefined}>
                           <Input
                             value={vendorProfileForm.maxRate}
                             onChange={(e) => setVendorProfileForm((p) => ({ ...p, maxRate: e.target.value }))}
@@ -4897,7 +4923,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                             className={vendorProfileFieldInvalid.maxRate ? "border-rose-400 bg-rose-50/40" : undefined}
                           />
                         </Field>
-                        <Field required label={locale === "ja" ? "チーム人数" : "Team Size"} hint={vendorProfileFieldInvalid.teamSize ? (locale === "ja" ? "1名以上を入力してください。" : "Enter at least one team member.") : undefined}>
+                        <Field label={locale === "ja" ? "チーム人数" : "Team Size"} hint={vendorProfileFieldInvalid.teamSize ? (locale === "ja" ? "1名以上を入力してください。" : "Enter at least one team member.") : undefined}>
                           <Input
                             value={vendorProfileForm.teamSize}
                             onChange={(e) => setVendorProfileForm((p) => ({ ...p, teamSize: e.target.value }))}
@@ -4941,7 +4967,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                           ? "翻訳付きプランでは、この設定言語を基準にプロフィール翻訳とチャット翻訳を行います。"
                           : "On the translation plan, this language is used as the base for profile and chat translation."}
                       </p>
-                      <Field required label={locale === "ja" ? "会社紹介" : "Company Summary"} hint={vendorProfileFieldInvalid.summary ? (locale === "ja" ? "公開前に入力してください。" : "Required before publishing.") : (locale === "ja" ? "発注企業に表示される紹介文です。" : "Shown to prospective buyers.")}>
+                      <Field label={locale === "ja" ? "会社紹介" : "Company Summary"} hint={vendorProfileFieldInvalid.summary ? (locale === "ja" ? "公開前に入力してください。" : "Required before publishing.") : (locale === "ja" ? "発注企業に表示される紹介文です。" : "Shown to prospective buyers.")}>
                         <Textarea rows={4} value={vendorProfileForm.summary} onChange={(e) => setVendorProfileForm((p) => ({ ...p, summary: e.target.value }))} required aria-invalid={vendorProfileFieldInvalid.summary} className={vendorProfileFieldInvalid.summary ? "border-rose-400 bg-rose-50/40" : undefined} />
                       </Field>
                       {vendorBilling?.translationEnabled ? (
@@ -5333,8 +5359,8 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                         </div>
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <Field label={locale === "ja" ? "案件名" : "Project Name"}>
-                          <Input value={portfolioDraft.title} onChange={(e) => updatePortfolioDraft({ title: e.target.value })} />
+                        <Field label={locale === "ja" ? "案件名" : "Project Name"} hint={portfolioSaveAttempted && !portfolioDraft.title.trim() ? (locale === "ja" ? "保存前に入力してください。" : "Required before saving.") : undefined}>
+                          <Input required aria-invalid={portfolioSaveAttempted && !portfolioDraft.title.trim()} className={portfolioSaveAttempted && !portfolioDraft.title.trim() ? "border-rose-400 bg-rose-50/40" : undefined} value={portfolioDraft.title} onChange={(e) => updatePortfolioDraft({ title: e.target.value })} />
                         </Field>
                         <Field label={locale === "ja" ? "実績カテゴリ" : "Project Category"}>
                           <select className="select-field" value={portfolioDraft.projectType} onChange={(e) => updatePortfolioDraft({ projectType: e.target.value as PortfolioProject["projectType"] })}>
@@ -5344,17 +5370,20 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                           </select>
                         </Field>
                         <Field label={locale === "ja" ? "期間" : "Timeline"}>
-                          <Input value={portfolioDraft.durationLabel} onChange={(e) => updatePortfolioDraft({ durationLabel: e.target.value })} placeholder={locale === "ja" ? "例: 4ヶ月" : "Example: 4 months"} />
+                          <Input required aria-invalid={portfolioSaveAttempted && !portfolioDraft.durationLabel.trim()} className={portfolioSaveAttempted && !portfolioDraft.durationLabel.trim() ? "border-rose-400 bg-rose-50/40" : undefined} value={portfolioDraft.durationLabel} onChange={(e) => updatePortfolioDraft({ durationLabel: e.target.value })} placeholder={locale === "ja" ? "例: 4ヶ月" : "Example: 4 months"} />
                         </Field>
                         <Field label={locale === "ja" ? "予算目安" : "Budget Range"}>
-                          <Input value={portfolioDraft.budgetLabel} onChange={(e) => updatePortfolioDraft({ budgetLabel: e.target.value })} placeholder={locale === "ja" ? "例: 300万〜500万円" : "Example: JPY 3M-5M"} />
+                          <Input required aria-invalid={portfolioSaveAttempted && !portfolioDraft.budgetLabel.trim()} className={portfolioSaveAttempted && !portfolioDraft.budgetLabel.trim() ? "border-rose-400 bg-rose-50/40" : undefined} value={portfolioDraft.budgetLabel} onChange={(e) => updatePortfolioDraft({ budgetLabel: e.target.value })} placeholder={locale === "ja" ? "例: 300万〜500万円" : "Example: JPY 3M-5M"} />
                         </Field>
                       </div>
                       <Field label={locale === "ja" ? "案件概要" : "Project Summary"}>
-                        <Textarea rows={3} value={portfolioDraft.summary} onChange={(e) => updatePortfolioDraft({ summary: e.target.value })} />
+                        <Textarea required aria-invalid={portfolioSaveAttempted && !portfolioDraft.summary.trim()} className={portfolioSaveAttempted && !portfolioDraft.summary.trim() ? "border-rose-400 bg-rose-50/40" : undefined} rows={3} value={portfolioDraft.summary} onChange={(e) => updatePortfolioDraft({ summary: e.target.value })} />
                       </Field>
-                      <Field label={locale === "ja" ? "技術スタック（カンマ区切り）" : "Tech Stack (comma separated)"}>
+                      <Field label={locale === "ja" ? "技術スタック（カンマ区切り）" : "Tech Stack (comma separated)"} hint={portfolioSaveAttempted && !portfolioDraft.technologies.length ? (locale === "ja" ? "技術スタックを1つ以上入力してください。" : "Add at least one technology.") : undefined}>
                         <Input
+                          required
+                          aria-invalid={portfolioSaveAttempted && !portfolioDraft.technologies.length}
+                          className={portfolioSaveAttempted && !portfolioDraft.technologies.length ? "border-rose-400 bg-rose-50/40" : undefined}
                           value={portfolioTechnologiesInput}
                           onChange={(e) => {
                             const nextValue = e.target.value;
@@ -5365,8 +5394,8 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                           }}
                         />
                       </Field>
-                      <Field label={locale === "ja" ? "成果 / ビジネス効果" : "Outcome / Business Impact"}>
-                        <Textarea rows={2} value={portfolioDraft.businessImpact} onChange={(e) => updatePortfolioDraft({ businessImpact: e.target.value })} />
+                      <Field label={locale === "ja" ? "成果 / ビジネス効果" : "Outcome / Business Impact"} hint={portfolioSaveAttempted && !portfolioDraft.businessImpact.trim() ? (locale === "ja" ? "成果・ビジネス効果を入力してください。" : "Enter an outcome or business impact.") : undefined}>
+                        <Textarea required aria-invalid={portfolioSaveAttempted && !portfolioDraft.businessImpact.trim()} className={portfolioSaveAttempted && !portfolioDraft.businessImpact.trim() ? "border-rose-400 bg-rose-50/40" : undefined} rows={2} value={portfolioDraft.businessImpact} onChange={(e) => updatePortfolioDraft({ businessImpact: e.target.value })} />
                       </Field>
                       {vendorBilling?.translationEnabled ? (
                         <div className="grid gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">

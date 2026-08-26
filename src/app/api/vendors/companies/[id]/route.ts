@@ -43,9 +43,24 @@ export async function PATCH(request: Request, { params }: Params) {
   const japaneseSupport = body.japaneseSupport ? (String(body.japaneseSupport) as Company["japaneseSupport"]) : "basic";
 
   if (!name) return NextResponse.json({ error: "company name is required." }, { status: 400 });
-  if (!Number.isFinite(minRate) || minRate < 0) return NextResponse.json({ error: "minRate must be a valid number." }, { status: 400 });
+  if (!country) return NextResponse.json({ error: "country is required." }, { status: 400 });
+  if (!summary) return NextResponse.json({ error: "summary is required." }, { status: 400 });
+  if (!contactName) return NextResponse.json({ error: "contact name is required." }, { status: 400 });
+  if (services.length === 0) return NextResponse.json({ error: "at least one service is required." }, { status: 400 });
+  if (!Number.isFinite(minRate) || minRate <= 0) return NextResponse.json({ error: "minRate must be greater than zero." }, { status: 400 });
   if (!Number.isFinite(maxRate) || maxRate < minRate) return NextResponse.json({ error: "maxRate must be greater than or equal to minRate." }, { status: 400 });
-  if (!Number.isFinite(teamSize) || teamSize < 0) return NextResponse.json({ error: "teamSize must be a valid number." }, { status: 400 });
+  if (!Number.isFinite(teamSize) || teamSize < 1) return NextResponse.json({ error: "teamSize must be at least 1." }, { status: 400 });
+  const hasInvalidPortfolioProject = portfolioProjects.some((project) => (
+    !project.title?.trim()
+    || !project.durationLabel?.trim()
+    || !project.budgetLabel?.trim()
+    || !project.summary?.trim()
+    || !project.businessImpact?.trim()
+    || !project.technologies?.length
+  ));
+  if (hasInvalidPortfolioProject) {
+    return NextResponse.json({ error: "Every portfolio project must include its name, timeline, budget, summary, technology stack, and outcome." }, { status: 400 });
+  }
 
   const updated = await updateCompanyProfile(id, {
     name,
