@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   const contactName = String(body.contactName ?? "").trim();
   const industry = String(body.industry ?? "").trim();
 
-  if (!companyName || !email || !isValidBuyerPassword(password)) {
+  if (!companyName || !/^\S+@\S+\.\S+$/.test(email) || !isValidBuyerPassword(password)) {
     return NextResponse.json({ error: "会社名・メール・8文字以上かつ数字を1つ以上含むパスワードを入力してください。" }, { status: 400 });
   }
 

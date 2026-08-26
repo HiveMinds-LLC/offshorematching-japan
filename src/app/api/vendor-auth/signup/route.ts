@@ -63,7 +63,7 @@ export async function POST(request: Request) {
   const contactName = String(body.contactName ?? "").trim();
   const acceptedTerms = body.acceptedTerms === true;
 
-  if (!company.name || !email || !contactName || !isValidPassword(password)) {
+  if (!company.name || !/^\S+@\S+\.\S+$/.test(email) || !contactName || !isValidPassword(password)) {
     return NextResponse.json({ error: "会社名・担当者名・連絡先メール・8文字以上かつ数字を1つ以上含むパスワードを入力してください。" }, { status: 400 });
   }
   if (!acceptedTerms) {
