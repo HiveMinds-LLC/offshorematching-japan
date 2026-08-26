@@ -26,15 +26,9 @@ set public = excluded.public,
 -- One company has one canonical image object: {company-id}/thumbnail.
 -- The app currently writes through a server-side authenticated route, but these
 -- policies also make direct vendor uploads safe if the client flow changes later.
-drop policy if exists "Public read company thumbnails" on storage.objects;
 drop policy if exists "Vendors insert own company thumbnail" on storage.objects;
 drop policy if exists "Vendors update own company thumbnail" on storage.objects;
 drop policy if exists "Vendors delete own company thumbnail" on storage.objects;
-
-create policy "Public read company thumbnails"
-on storage.objects for select
-to public
-using (bucket_id = 'company-thumbnails');
 
 create policy "Vendors insert own company thumbnail"
 on storage.objects for insert
