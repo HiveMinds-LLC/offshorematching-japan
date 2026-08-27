@@ -11,11 +11,11 @@ type PasswordInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "typ
 export function PasswordInput({ className, ...props }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
   return (
-    <div className="relative flex items-center">
+    <div className="relative flex h-11 w-full items-center">
       <input
         type={visible ? "text" : "password"}
         className={cn(
-          "w-full rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-10 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100",
+          "h-full w-full rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-10 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100",
           className
         )}
         {...props}
