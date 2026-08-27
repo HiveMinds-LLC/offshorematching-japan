@@ -437,12 +437,11 @@ function autosizeTextarea(element: HTMLTextAreaElement) {
   element.style.height = `${Math.min(element.scrollHeight, 160)}px`;
 }
 
-function Field({ label, children, required = false, hint, invalid = false }: { label: string; children: ReactNode; required?: boolean; hint?: string; invalid?: boolean }) {
+function Field({ label, children, hint, invalid = false }: { label: string; children: ReactNode; hint?: string; invalid?: boolean }) {
   return (
     <label className="grid gap-1.5">
       <span className="flex items-center gap-2 field-label">
         {label}
-        {required ? <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">必須 / Required</span> : null}
       </span>
       {children}
       {hint ? <span className={invalid ? "text-xs text-rose-600" : "text-xs text-slate-500"}>{hint}</span> : null}
@@ -3810,10 +3809,10 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                   </p>
                 </div>
                 <div className="grid min-h-[86px] gap-3 sm:grid-cols-2">
-                  <Field required label={locale === "ja" ? "メール" : "Email"} hint={loginAttempted && !loginEmail.trim() ? (locale === "ja" ? "メールアドレスを入力してください。" : "Enter your email address.") : undefined} invalid={loginAttempted && !loginEmail.trim()}>
+                  <Field label={locale === "ja" ? "メール" : "Email"} hint={loginAttempted && !loginEmail.trim() ? (locale === "ja" ? "メールアドレスを入力してください。" : "Enter your email address.") : undefined} invalid={loginAttempted && !loginEmail.trim()}>
                     <Input className={`h-11 ${loginAttempted && !loginEmail.trim() ? "border-rose-400 bg-rose-50/40" : ""}`} value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required aria-invalid={loginAttempted && !loginEmail.trim()} />
                   </Field>
-                  <Field required label={locale === "ja" ? "パスワード" : "Password"} hint={loginAttempted && !loginPassword ? (locale === "ja" ? "パスワードを入力してください。" : "Enter your password.") : undefined} invalid={loginAttempted && !loginPassword}>
+                  <Field label={locale === "ja" ? "パスワード" : "Password"} hint={loginAttempted && !loginPassword ? (locale === "ja" ? "パスワードを入力してください。" : "Enter your password.") : undefined} invalid={loginAttempted && !loginPassword}>
                     <PasswordInput className={`h-11 ${loginAttempted && !loginPassword ? "border-rose-400 bg-rose-50/40" : ""}`} value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required aria-invalid={loginAttempted && !loginPassword} />
                   </Field>
                 </div>

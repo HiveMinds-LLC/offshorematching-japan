@@ -227,7 +227,7 @@ export default function VendorRegisterPage() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="grid gap-1.5">
-                  <span className="field-label">{locale === "ja" ? "会社名" : "Company Name"} <span className="text-rose-500">*</span></span>
+                  <span className="field-label">{locale === "ja" ? "会社名" : "Company Name"}</span>
                   <Input required aria-invalid={stepOneAttempted && stepOneInvalid.name} className={stepOneAttempted && stepOneInvalid.name ? "border-rose-400 bg-rose-50/40" : undefined} value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
                   {stepOneAttempted && stepOneInvalid.name ? <span className="text-xs text-rose-600">{locale === "ja" ? "会社名を入力してください。" : "Enter your company name."}</span> : null}
                 </label>
@@ -236,17 +236,17 @@ export default function VendorRegisterPage() {
                   <Input value={form.country} onChange={(e) => setForm((p) => ({ ...p, country: e.target.value }))} />
                 </label>
                 <label className="grid gap-1.5">
-                  <span className="field-label">{locale === "ja" ? "担当者名" : "Contact Name"} <span className="text-rose-500">*</span></span>
+                  <span className="field-label">{locale === "ja" ? "担当者名" : "Contact Name"}</span>
                   <Input required aria-invalid={stepOneAttempted && stepOneInvalid.contactName} className={stepOneAttempted && stepOneInvalid.contactName ? "border-rose-400 bg-rose-50/40" : undefined} value={form.contactName} onChange={(e) => setForm((p) => ({ ...p, contactName: e.target.value }))} />
                   {stepOneAttempted && stepOneInvalid.contactName ? <span className="text-xs text-rose-600">{locale === "ja" ? "担当者名を入力してください。" : "Enter a contact name."}</span> : null}
                 </label>
                 <label className="grid gap-1.5">
-                  <span className="field-label">{locale === "ja" ? "連絡先メール" : "Contact Email"} <span className="text-rose-500">*</span></span>
+                  <span className="field-label">{locale === "ja" ? "連絡先メール" : "Contact Email"}</span>
                   <Input type="email" required aria-invalid={stepOneAttempted && stepOneInvalid.contactEmail} className={stepOneAttempted && stepOneInvalid.contactEmail ? "border-rose-400 bg-rose-50/40" : undefined} value={form.contactEmail} onChange={(e) => setForm((p) => ({ ...p, contactEmail: e.target.value }))} />
                   {stepOneAttempted && stepOneInvalid.contactEmail ? <span className="text-xs text-rose-600">{locale === "ja" ? "有効なメールアドレスを入力してください。" : "Enter a valid email address."}</span> : null}
                 </label>
                 <label className="grid gap-1.5 sm:col-span-2">
-                  <span className="field-label">{locale === "ja" ? "パスワード" : "Password"} <span className="text-rose-500">*</span></span>
+                  <span className="field-label">{locale === "ja" ? "パスワード" : "Password"}</span>
                   <PasswordInput required aria-invalid={stepOneAttempted && stepOneInvalid.password} className={stepOneAttempted && stepOneInvalid.password ? "border-rose-400 bg-rose-50/40" : undefined} value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
                   <span className="text-xs text-slate-500">{locale === "ja" ? "ログインに使う必須パスワードです。8文字以上かつ数字を1つ以上含めてください。" : "This password will be used for sign-in. Use at least 8 characters and include at least 1 number."}</span>
                   {stepOneAttempted && stepOneInvalid.password ? <span className="text-xs text-rose-600">{locale === "ja" ? "パスワードは8文字以上で、数字を1つ以上含めてください。" : "Use at least 8 characters and include a number."}</span> : null}

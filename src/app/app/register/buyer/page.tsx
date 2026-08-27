@@ -97,7 +97,7 @@ export default function BuyerRegisterPage() {
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1.5">
-              <span className="field-label">{locale === "ja" ? "会社名" : "Company name"} <span className="text-rose-500">*</span></span>
+              <span className="field-label">{locale === "ja" ? "会社名" : "Company name"}</span>
               <Input required aria-invalid={attempted && invalid.companyName} className={attempted && invalid.companyName ? "border-rose-400 bg-rose-50/40" : undefined} value={form.companyName} onChange={(e) => setForm((p) => ({ ...p, companyName: e.target.value }))} />
               {attempted && invalid.companyName ? <span className="text-xs text-rose-600">{locale === "ja" ? "会社名を入力してください。" : "Enter your company name."}</span> : null}
             </label>
@@ -110,13 +110,13 @@ export default function BuyerRegisterPage() {
               <Input value={form.contactName} onChange={(e) => setForm((p) => ({ ...p, contactName: e.target.value }))} />
             </label>
             <label className="grid gap-1.5">
-              <span className="field-label">{locale === "ja" ? "メール" : "Email"} <span className="text-rose-500">*</span></span>
+              <span className="field-label">{locale === "ja" ? "メール" : "Email"}</span>
               <Input type="email" required aria-invalid={attempted && invalid.email} className={attempted && invalid.email ? "border-rose-400 bg-rose-50/40" : undefined} value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
               {attempted && invalid.email ? <span className="text-xs text-rose-600">{locale === "ja" ? "有効なメールアドレスを入力してください。" : "Enter a valid email address."}</span> : null}
             </label>
           </div>
           <label className="grid gap-1.5 sm:max-w-sm">
-            <span className="field-label">{locale === "ja" ? "パスワード" : "Password"} <span className="text-rose-500">*</span></span>
+            <span className="field-label">{locale === "ja" ? "パスワード" : "Password"}</span>
             <Input type="password" required aria-invalid={attempted && invalid.password} className={attempted && invalid.password ? "border-rose-400 bg-rose-50/40" : undefined} value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
             <span className="text-xs leading-6 text-slate-500">
               {locale === "ja" ? "8文字以上で、数字を1つ以上含めてください。ログイン時にもこのパスワードを使用します。" : "At least 8 characters including one number. You will use this password to log in."}

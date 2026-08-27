@@ -19,11 +19,10 @@ type AppTopbarProps = {
   }>;
 };
 
-export function AppTopbar({ title, titleEn, subtitle, subtitleEn }: AppTopbarProps) {
+export function AppTopbar({ title, titleEn }: AppTopbarProps) {
   const { locale } = useLocale();
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const resolvedTitle = locale === "ja" ? title : (titleEn ?? title);
-  const resolvedSubtitle = locale === "ja" ? subtitle : (subtitleEn ?? subtitle);
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("offshorekaihatsu.app-theme") ?? window.localStorage.getItem("offshoredevelopment.app-theme");
@@ -42,10 +41,10 @@ export function AppTopbar({ title, titleEn, subtitle, subtitleEn }: AppTopbarPro
   }
 
   return (
-    <header data-site-nav className="border-b border-slate-200/80 bg-white/90 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-          <Link href="/" className="inline-flex items-center gap-2 font-[family-name:var(--font-display)] text-lg font-extrabold text-slate-900">
+    <header data-site-nav className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
+      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-5 py-4 lg:px-8">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Link href="/" className="inline-flex items-center gap-2.5 font-[family-name:var(--font-display)] text-base font-extrabold tracking-tight text-slate-950 sm:text-lg">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-blue-100 bg-white p-1 shadow-sm">
               <Image src="/icon.png" alt="" width={24} height={24} className="h-full w-full object-contain" priority />
             </span>
@@ -66,16 +65,11 @@ export function AppTopbar({ title, titleEn, subtitle, subtitleEn }: AppTopbarPro
           >
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
-          <Link href="/" className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+          <Link href="/" className="rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
             {locale === "ja" ? "ホーム" : "Home"}
           </Link>
         </div>
       </div>
-      {resolvedSubtitle ? (
-        <div className="mx-auto w-full max-w-7xl px-4 pb-3">
-          <p className="text-xs text-slate-500">{resolvedSubtitle}</p>
-        </div>
-      ) : null}
     </header>
   );
 }
