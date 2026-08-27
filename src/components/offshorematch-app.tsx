@@ -664,6 +664,7 @@ export function OffshoreMatchApp({
   const [vendorProfileEditing, setVendorProfileEditing] = useState(false);
   const [vendorProfileMessage, setVendorProfileMessage] = useState("");
   const [vendorProfileSaving, setVendorProfileSaving] = useState(false);
+  const [vendorProfileSaveAttempted, setVendorProfileSaveAttempted] = useState(false);
   const [companyThumbnailLoading, setCompanyThumbnailLoading] = useState(false);
   const [pendingCompanyThumbnail, setPendingCompanyThumbnail] = useState<PendingCompanyThumbnail | null>(null);
   const [editingPortfolioProjectId, setEditingPortfolioProjectId] = useState("");
@@ -1889,6 +1890,8 @@ export function OffshoreMatchApp({
     [vendorProfileForm, locale]
   );
   const vendorProfileFieldInvalid = useMemo(() => {
+    const none = { name: false, country: false, contactName: false, services: false, minRate: false, maxRate: false, teamSize: false, summary: false };
+    if (!vendorProfileSaveAttempted) return none;
     const minRate = Number(vendorProfileForm.minRate);
     const maxRate = Number(vendorProfileForm.maxRate);
     return {
@@ -1901,7 +1904,7 @@ export function OffshoreMatchApp({
       teamSize: !Number.isFinite(Number(vendorProfileForm.teamSize)) || Number(vendorProfileForm.teamSize) <= 0,
       summary: !vendorProfileForm.summary.trim()
     };
-  }, [vendorProfileForm]);
+  }, [vendorProfileForm, vendorProfileSaveAttempted]);
   const portfolioDraftIssues = useMemo(
     () => (portfolioDraft && portfolioSaveAttempted ? getPortfolioDraftIssues(portfolioDraft, locale) : {}),
     [portfolioDraft, portfolioSaveAttempted, locale]
@@ -2322,6 +2325,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
   }
 
   async function handleSaveVendorProfile() {
+    setVendorProfileSaveAttempted(true);
     setVendorProfileSaving(true);
     setVendorProfileMessage("");
     try {
@@ -2348,6 +2352,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
           setPendingCompanyThumbnail(null);
         }
         setVendorProfileEditing(false);
+        setVendorProfileSaveAttempted(false);
         setEditingPortfolioProjectId("");
         setPortfolioDraft(null);
         toast({
@@ -4671,6 +4676,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                               setVendorProfileMessage("");
                               setProfileTranslationMessage("");
                               setVendorProfileEditing(false);
+                              setVendorProfileSaveAttempted(false);
                             }}
                           >
                             {locale === "ja" ? "キャンセル" : "Cancel"}
