@@ -9,7 +9,9 @@ import { useLocale } from "@/components/i18n/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useToast } from "@/components/ui/toaster";
+import { isValidEmail, isValidPassword } from "@/lib/validation";
 
 type BuyerSignupForm = {
   companyName: string;
@@ -27,10 +29,6 @@ const defaults: BuyerSignupForm = {
   password: ""
 };
 
-function isValidBuyerPassword(password: string) {
-  return password.length >= 8 && /\d/.test(password);
-}
-
 export default function BuyerRegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -41,8 +39,8 @@ export default function BuyerRegisterPage() {
 
   const invalid = {
     companyName: !form.companyName.trim(),
-    email: !/^\S+@\S+\.\S+$/.test(form.email),
-    password: !isValidBuyerPassword(form.password)
+    email: !isValidEmail(form.email),
+    password: !isValidPassword(form.password)
   };
 
   async function handleSubmit() {
@@ -117,7 +115,7 @@ export default function BuyerRegisterPage() {
           </div>
           <label className="grid gap-1.5 sm:max-w-sm">
             <span className="field-label">{locale === "ja" ? "パスワード" : "Password"} <span className="text-rose-500">*</span></span>
-            <Input type="password" required aria-invalid={attempted && invalid.password} className={attempted && invalid.password ? "border-rose-400 bg-rose-50/40" : undefined} value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
+            <PasswordInput required aria-invalid={attempted && invalid.password} className={attempted && invalid.password ? "border-rose-400 bg-rose-50/40" : undefined} value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
             <span className="text-xs leading-6 text-slate-500">
               {locale === "ja" ? "8文字以上で、数字を1つ以上含めてください。ログイン時にもこのパスワードを使用します。" : "At least 8 characters including one number. You will use this password to log in."}
             </span>

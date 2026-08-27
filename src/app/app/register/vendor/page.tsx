@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { useToast } from "@/components/ui/toaster";
 import { TERMS_VERSION } from "@/lib/legal";
+import { isValidEmail, isValidPassword } from "@/lib/validation";
 
 type VendorSignupForm = {
   plan: "basic" | "translation";
@@ -49,8 +50,8 @@ export default function VendorRegisterPage() {
   const stepOneInvalid = {
     name: !form.name.trim(),
     contactName: !form.contactName.trim(),
-    contactEmail: !/^\S+@\S+\.\S+$/.test(form.contactEmail),
-    password: form.password.length < 8 || !/\d/.test(form.password)
+    contactEmail: !isValidEmail(form.contactEmail),
+    password: !isValidPassword(form.password)
   };
 
   const selectedPlan = useMemo(
@@ -77,7 +78,7 @@ export default function VendorRegisterPage() {
 
   function validateStepOne() {
     setStepOneAttempted(true);
-    if (!form.name.trim() || !form.contactName.trim() || !/^\S+@\S+\.\S+$/.test(form.contactEmail) || !form.password) {
+    if (!form.name.trim() || !form.contactName.trim() || !isValidEmail(form.contactEmail) || !form.password) {
       toast({
         tone: "error",
         title: locale === "ja" ? "基本情報を確認してください" : "Check the required details",
@@ -85,7 +86,7 @@ export default function VendorRegisterPage() {
       });
       return false;
     }
-    if (form.password.length < 8 || !/\d/.test(form.password)) {
+    if (!isValidPassword(form.password)) {
       toast({
         tone: "error",
         title: locale === "ja" ? "パスワードを確認してください" : "Check the password",
