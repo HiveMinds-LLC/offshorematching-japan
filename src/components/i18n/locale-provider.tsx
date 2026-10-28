@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 
 export type SiteLocale = "ja" | "en";
 
@@ -9,25 +9,43 @@ type LocaleContextValue = {
   setLocale: (locale: SiteLocale) => void;
 };
 
+const LOCALE_KEY = "offshorematch-locale";
+const localeListeners = new Set<() => void>();
 const LocaleContext = createContext<LocaleContextValue | null>(null);
 
-export function LocaleProvider({ children }: { children: ReactNode }) {
-  // Always initialize with "ja" so the server render and the client's first
-  // render match. A useEffect then applies the stored preference, which avoids
-  // a React hydration mismatch caused by localStorage reads in the initializer.
-  const [locale, setLocale] = useState<SiteLocale>("ja");
+function subscribeLocale(listener: () => void) {
+  localeListeners.add(listener);
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === LOCALE_KEY) listener();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    localeListeners.delete(listener);
+    window.removeEventListener("storage", onStorage);
+  };
+}
 
-  useEffect(() => {
-    const stored = window.localStorage.getItem("offshorematch-locale");
-    if (stored === "ja" || stored === "en") setLocale(stored);
+function getLocaleSnapshot(): SiteLocale {
+  return window.localStorage.getItem(LOCALE_KEY) === "en" ? "en" : "ja";
+}
+
+function getLocaleServerSnapshot(): SiteLocale {
+  return "ja";
+}
+
+export function LocaleProvider({ children }: { children: ReactNode }) {
+  const locale = useSyncExternalStore(subscribeLocale, getLocaleSnapshot, getLocaleServerSnapshot);
+  const setLocale = useCallback((nextLocale: SiteLocale) => {
+    window.localStorage.setItem(LOCALE_KEY, nextLocale);
+    document.documentElement.lang = nextLocale;
+    localeListeners.forEach((listener) => listener());
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem("offshorematch-locale", locale);
     document.documentElement.lang = locale;
   }, [locale]);
 
-  const value = useMemo(() => ({ locale, setLocale }), [locale]);
+  const value = useMemo(() => ({ locale, setLocale }), [locale, setLocale]);
 
   return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>;
 }

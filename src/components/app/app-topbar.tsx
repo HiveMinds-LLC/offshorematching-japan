@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Moon, Sun } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useAppTheme } from "@/components/app/use-app-theme";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { useLocale } from "@/components/i18n/locale-provider";
 
@@ -21,24 +21,8 @@ type AppTopbarProps = {
 
 export function AppTopbar({ title, titleEn }: AppTopbarProps) {
   const { locale } = useLocale();
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const { theme, toggleTheme } = useAppTheme();
   const resolvedTitle = locale === "ja" ? title : (titleEn ?? title);
-
-  useEffect(() => {
-    const savedTheme = window.localStorage.getItem("offshorekaihatsu.app-theme") ?? window.localStorage.getItem("offshoredevelopment.app-theme");
-    const nextTheme = savedTheme === "dark" || savedTheme === "light"
-      ? savedTheme
-      : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    setTheme(nextTheme);
-    document.body.classList.toggle("app-theme-dark", nextTheme === "dark");
-  }, []);
-
-  function toggleTheme() {
-    const nextTheme = theme === "dark" ? "light" : "dark";
-    setTheme(nextTheme);
-    window.localStorage.setItem("offshorekaihatsu.app-theme", nextTheme);
-    document.body.classList.toggle("app-theme-dark", nextTheme === "dark");
-  }
 
   return (
     <header data-site-nav className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">

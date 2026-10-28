@@ -1115,19 +1115,22 @@ async function loadSupabaseCompanies(client: SupabaseClient) {
     };
   });
 
-  await Promise.all(
-    scoredRows
-      .filter(({ normalizedRow, score }) =>
-        Number(normalizedRow.listing_score_total ?? 0) !== score.totalScore ||
-        Number(normalizedRow.listing_score_plan ?? 0) !== score.planScore ||
-        Number(normalizedRow.listing_score_profile ?? 0) !== score.profileScore ||
-        Number(normalizedRow.listing_score_portfolio ?? 0) !== score.portfolioScore ||
-        Number(normalizedRow.listing_score_completed_projects ?? 0) !== score.completedProjectsScore ||
-        Number(normalizedRow.listing_score_new_vendor_boost ?? 0) !== score.newVendorBoostScore ||
-        Number(normalizedRow.listing_completed_projects_count ?? 0) !== score.completedProjectsCount
-      )
-      .map(({ normalizedRow }) => recalculateVendorListingScoreByCompanyId(client, String(normalizedRow.id)))
+  const staleScoreRows = scoredRows.filter(({ normalizedRow, score }) =>
+    Number(normalizedRow.listing_score_total ?? 0) !== score.totalScore ||
+    Number(normalizedRow.listing_score_plan ?? 0) !== score.planScore ||
+    Number(normalizedRow.listing_score_profile ?? 0) !== score.profileScore ||
+    Number(normalizedRow.listing_score_portfolio ?? 0) !== score.portfolioScore ||
+    Number(normalizedRow.listing_score_completed_projects ?? 0) !== score.completedProjectsScore ||
+    Number(normalizedRow.listing_score_new_vendor_boost ?? 0) !== score.newVendorBoostScore ||
+    Number(normalizedRow.listing_completed_projects_count ?? 0) !== score.completedProjectsCount
   );
+  if (staleScoreRows.length > 0) {
+    void Promise.all(
+      staleScoreRows.map(({ normalizedRow }) => recalculateVendorListingScoreByCompanyId(client, String(normalizedRow.id)))
+    ).catch((error) => {
+      console.error("Failed to persist vendor listing scores", error);
+    });
+  }
 
   return scoredRows
     .sort((a, b) =>
@@ -2237,11 +2240,38 @@ export function getBuyerFromSessionToken(token: string | undefined) {
   return mockDb.getBuyerByToken(token);
 }
 
+function threadActivityFields(
+  messages: Array<{ body: string; createdAt: string }>,
+  createdAt: string,
+  deal: DealRecord | null
+) {
+  const latest = messages[messages.length - 1];
+  return {
+    status: deal?.status ?? "相談中",
+    lockedAt: deal?.lockedAt ?? null,
+    proposedStatus: deal?.proposedStatus ?? null,
+    proposedBy: deal?.proposedBy ?? null,
+    lastMessage: latest?.body ?? "",
+    lastMessageAt: latest?.createdAt ?? createdAt,
+    messageCount: messages.length
+  };
+}
+
+function enrichMockThread(thread: { id: string; buyerEmail: string; vendorCompanyId: string; createdAt: string }) {
+  const messages = mockDb.listMessages(thread.id);
+  const company = mockDb.getCompany(thread.vendorCompanyId);
+  return {
+    ...thread,
+    ...threadActivityFields(messages, thread.createdAt, mockDb.getDeal(thread.id)),
+    vendorCompanyName: company?.name
+  };
+}
+
 export async function listThreadsForBuyerByUserId(userId: string, email: string) {
-  if (!isSupabaseConfigured()) return mockDb.listThreads(email);
+  if (!isSupabaseConfigured()) return mockDb.listThreads(email).map(enrichMockThread);
 
   const client = serviceClient();
-  if (!client) return mockDb.listThreads(email);
+  if (!client) return mockDb.listThreads(email).map(enrichMockThread);
 
   const buyerOrg = await getBuyerOrgRowByUserId(client, userId);
   if (!buyerOrg) return [];
@@ -2304,13 +2334,13 @@ export async function listThreadsForBuyerByUserId(userId: string, email: string)
       deal,
       messages: messagesByThreadId.get(String(row.id)) ?? []
     });
+    const createdAt = String(row.created_at);
     return {
       id: String(row.id),
       buyerEmail: email,
       vendorCompanyId: String(row.vendor_profile_id),
-      createdAt: String(row.created_at),
-      status: deal?.status ?? "相談中",
-      lockedAt: deal?.lockedAt ?? null,
+      createdAt,
+      ...threadActivityFields(messagesByThreadId.get(String(row.id)) ?? [], createdAt, deal),
       vendorCompanyName: profile?.company_name ? String(profile.company_name) : undefined,
       vendorContactName: profile?.application_id ? vendorContactByApplicationId.get(String(profile.application_id)) ?? undefined : undefined,
       unreadCount: signal.unreadCount,
@@ -2322,7 +2352,7 @@ export async function listThreadsForBuyerByUserId(userId: string, email: string)
 export async function listThreadsForVendorByUserId(userId: string) {
   if (!isSupabaseConfigured()) {
     const company = mockDb.listCompanies().find((entry) => entry.id === userId);
-    return company ? mockDb.listThreadsByVendorCompanyId(company.id) : [];
+    return company ? mockDb.listThreadsByVendorCompanyId(company.id).map(enrichMockThread) : [];
   }
 
   const client = serviceClient();
@@ -2385,13 +2415,13 @@ export async function listThreadsForVendorByUserId(userId: string) {
       deal,
       messages: messagesByThreadId.get(String(row.id)) ?? []
     });
+    const createdAt = String(row.created_at);
     return {
       id: String(row.id),
       buyerEmail: buyerRow?.company_name ? String(buyerRow.company_name) : "",
       vendorCompanyId: String(row.vendor_profile_id),
-      createdAt: String(row.created_at),
-      status: deal?.status ?? "相談中",
-      lockedAt: deal?.lockedAt ?? null,
+      createdAt,
+      ...threadActivityFields(messagesByThreadId.get(String(row.id)) ?? [], createdAt, deal),
       buyerCompanyName: buyerRow?.company_name ? String(buyerRow.company_name) : undefined,
       buyerContactName: buyerRow?.contact_name ? String(buyerRow.contact_name) : undefined,
       unreadCount: signal.unreadCount,
