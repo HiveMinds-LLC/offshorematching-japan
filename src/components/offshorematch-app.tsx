@@ -792,6 +792,29 @@ export function OffshoreMatchApp({
   const [browserSupabaseReady, setBrowserSupabaseReady] = useState(false);
   const buyerMessagingVisible = activeSection === "buyer-messages" || activeSection === "buyer-overview";
   const vendorMessagingVisible = activeSection === "vendor-messages" || activeSection === "vendor-overview";
+  const buyerConversationKey = buyerMessagingVisible && activeThreadId ? activeThreadId : "";
+  const vendorConversationKey = vendorMessagingVisible && activeVendorThreadId && activeVendorCompany
+    ? `${activeVendorCompany.id}:${activeVendorThreadId}`
+    : "";
+  const [syncedBuyerConversationKey, setSyncedBuyerConversationKey] = useState(buyerConversationKey);
+  const [syncedVendorConversationKey, setSyncedVendorConversationKey] = useState(vendorConversationKey);
+  if (syncedBuyerConversationKey !== buyerConversationKey) {
+    setSyncedBuyerConversationKey(buyerConversationKey);
+    setThreadMessages([]);
+    setPendingThreadMessages([]);
+    setThreadMessagesLoading(buyerConversationKey.length > 0);
+    setActiveBuyerDeal(null);
+  }
+  if (syncedVendorConversationKey !== vendorConversationKey) {
+    setSyncedVendorConversationKey(vendorConversationKey);
+    setVendorThreadMessages([]);
+    setPendingVendorThreadMessages([]);
+    setVendorThreadMessagesLoading(vendorConversationKey.length > 0);
+    setActiveVendorDeal(null);
+  }
+  if (vendorBilling && vendorBilling.companyId !== activeVendorCompany?.id) {
+    setVendorBilling(null);
+  }
   const billingReturnFlag = searchParams.get("billing_return");
   const activeVendorBillingCompanyId = vendorBilling?.companyId || activeVendorCompany?.id || "";
 
