@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { BriefcaseBusiness, Building2, ChevronDown, ChevronRight, FolderKanban, ImagePlus, Languages, MessageSquareMore, Pencil, Sparkles, Star, Trash2, Users, Wallet } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { RemoteImage } from "@/components/ui/remote-image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -77,6 +78,11 @@ type BuyerThread = {
   vendorContactName?: string;
   unreadCount?: number;
   notificationKind?: "new-chat" | "proposal-received" | "proposal-accepted" | null;
+  lastMessage?: string;
+  lastMessageAt?: string;
+  messageCount?: number;
+  proposedStatus?: DealStatus | null;
+  proposedBy?: "buyer" | "vendor" | null;
 };
 
 type ThreadOverview = {
@@ -94,6 +100,22 @@ type ThreadOverview = {
 };
 
 const dealStatusOptions: DealStatus[] = ["相談中", "進行中", "完了"];
+
+function toThreadOverview(thread: BuyerThread, counterpartyLabel: string, emptyMessage: string): ThreadOverview {
+  return {
+    threadId: thread.id,
+    counterpartyLabel,
+    lastMessage: thread.lastMessage?.trim() || emptyMessage,
+    lastMessageAt: thread.lastMessageAt || thread.createdAt,
+    messageCount: thread.messageCount ?? 0,
+    status: thread.status ?? "相談中",
+    proposedStatus: thread.proposedStatus ?? null,
+    proposedBy: thread.proposedBy ?? null,
+    lockedAt: thread.lockedAt ?? null,
+    unreadCount: thread.unreadCount ?? 0,
+    notificationKind: thread.notificationKind ?? null
+  };
+}
 
 const MARKETPLACE_PAGE_SIZE = 9;
 
@@ -500,13 +522,11 @@ function CompanyCard({ company, score, locale = "ja" }: { company: Company; scor
       <Card className="flex h-full flex-col gap-3">
         {company.thumbnailUrl || company.thumbnailCardUrl ? (
           <div className="relative aspect-[16/7] overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 shadow-sm">
-            <img
-              src={company.thumbnailCardUrl ?? company.thumbnailUrl}
+            <RemoteImage
+              src={company.thumbnailCardUrl ?? company.thumbnailUrl ?? ""}
               alt={locale === "ja" ? `${company.name}の会社画像` : `${company.name} company image`}
-              className="h-full w-full object-cover transition duration-500 ease-out group-hover:scale-[1.04]"
-              loading="lazy"
-              decoding="async"
-              fetchPriority="low"
+              className="object-cover transition duration-500 ease-out group-hover:scale-[1.04]"
+              sizes="(max-width: 768px) 100vw, 320px"
             />
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/45 via-slate-950/5 to-transparent" />
             <span className="absolute bottom-3 left-3 rounded-full border border-white/25 bg-slate-950/35 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
@@ -654,6 +674,7 @@ export function OffshoreMatchApp({
   const [projectFilter, setProjectFilter] = useState("");
   const [rateCap, setRateCap] = useState("");
   const [marketplacePage, setMarketplacePage] = useState(1);
+  const [trackedMarketplaceFilter, setTrackedMarketplaceFilter] = useState("\0\0\0");
   const [favoriteCompanyIds, setFavoriteCompanyIds] = useState<string[]>(initialFavoriteCompanyIds);
   const [favoriteMutationLoading, setFavoriteMutationLoading] = useState(false);
 
@@ -662,6 +683,7 @@ export function OffshoreMatchApp({
   const [currentVendorApplication, setCurrentVendorApplication] = useState<VendorApplication | null>(initialVendorApplication);
   const [vendorProfileForm, setVendorProfileForm] = useState(EMPTY_VENDOR_PROFILE_FORM);
   const [vendorProfileEditing, setVendorProfileEditing] = useState(false);
+  const [vendorProfileSyncKey, setVendorProfileSyncKey] = useState("");
   const [vendorProfileMessage, setVendorProfileMessage] = useState("");
   const [vendorProfileSaving, setVendorProfileSaving] = useState(false);
   const [vendorProfileSaveAttempted, setVendorProfileSaveAttempted] = useState(false);
@@ -685,6 +707,7 @@ export function OffshoreMatchApp({
   const [vendorBillingMessage, setVendorBillingMessage] = useState("");
   const [billingActionLoading, setBillingActionLoading] = useState("");
   const [restartPlanSelection, setRestartPlanSelection] = useState<Company["plan"]>(initialVendorBilling?.plan === "translation" || initialVendorCompany?.plan === "translation" ? "translation" : "basic");
+  const [restartPlanBaseline, setRestartPlanBaseline] = useState<Company["plan"]>(initialVendorBilling?.plan === "translation" || initialVendorCompany?.plan === "translation" ? "translation" : "basic");
   const [billingCancelConfirmOpen, setBillingCancelConfirmOpen] = useState(false);
   const [billingDowngradeConfirmOpen, setBillingDowngradeConfirmOpen] = useState(false);
   const [pendingBuyerCompletionProposal, setPendingBuyerCompletionProposal] = useState(false);
@@ -710,8 +733,6 @@ export function OffshoreMatchApp({
   const [pendingThreadMessages, setPendingThreadMessages] = useState<MessageRecord[]>([]);
   const [threadMessagesLoading, setThreadMessagesLoading] = useState(false);
   const [activeBuyerDeal, setActiveBuyerDeal] = useState<DealRecord | null>(null);
-  const [buyerThreadOverview, setBuyerThreadOverview] = useState<ThreadOverview[]>([]);
-  const [buyerThreadOverviewLoading, setBuyerThreadOverviewLoading] = useState(false);
   const [threadInput, setThreadInput] = useState("");
   const [threadMessageInfo, setThreadMessageInfo] = useState("");
   const [threadSending, setThreadSending] = useState(false);
@@ -730,8 +751,6 @@ export function OffshoreMatchApp({
   const [pendingVendorThreadMessages, setPendingVendorThreadMessages] = useState<MessageRecord[]>([]);
   const [vendorThreadMessagesLoading, setVendorThreadMessagesLoading] = useState(false);
   const [activeVendorDeal, setActiveVendorDeal] = useState<DealRecord | null>(null);
-  const [vendorThreadOverview, setVendorThreadOverview] = useState<ThreadOverview[]>([]);
-  const [vendorThreadOverviewLoading, setVendorThreadOverviewLoading] = useState(false);
   const [vendorThreadInput, setVendorThreadInput] = useState("");
   const [vendorThreadMessageInfo, setVendorThreadMessageInfo] = useState("");
   const [vendorThreadSending, setVendorThreadSending] = useState(false);
@@ -753,6 +772,11 @@ export function OffshoreMatchApp({
   const vendorBillingHydratedRef = useRef(Boolean(initialVendorBilling));
   const threadsInitializedRef = useRef(false);
   const vendorThreadsInitializedRef = useRef(false);
+  const sessionBootstrapRef = useRef(0);
+  const buyerConversationRequestRef = useRef(0);
+  const vendorConversationRequestRef = useRef(0);
+  const vendorBillingRequestRef = useRef(0);
+  const localeRef = useRef(locale);
 
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -768,8 +792,50 @@ export function OffshoreMatchApp({
   const [browserSupabaseReady, setBrowserSupabaseReady] = useState(false);
   const buyerMessagingVisible = activeSection === "buyer-messages" || activeSection === "buyer-overview";
   const vendorMessagingVisible = activeSection === "vendor-messages" || activeSection === "vendor-overview";
+  const buyerConversationKey = buyerMessagingVisible && activeThreadId ? activeThreadId : "";
+  const vendorConversationKey = vendorMessagingVisible && activeVendorThreadId && activeVendorCompany
+    ? `${activeVendorCompany.id}:${activeVendorThreadId}`
+    : "";
+  const [syncedBuyerConversationKey, setSyncedBuyerConversationKey] = useState(buyerConversationKey);
+  const [syncedVendorConversationKey, setSyncedVendorConversationKey] = useState(vendorConversationKey);
+  if (syncedBuyerConversationKey !== buyerConversationKey) {
+    setSyncedBuyerConversationKey(buyerConversationKey);
+    setThreadMessages([]);
+    setPendingThreadMessages([]);
+    setThreadMessagesLoading(buyerConversationKey.length > 0);
+    setActiveBuyerDeal(null);
+  }
+  if (syncedVendorConversationKey !== vendorConversationKey) {
+    setSyncedVendorConversationKey(vendorConversationKey);
+    setVendorThreadMessages([]);
+    setPendingVendorThreadMessages([]);
+    setVendorThreadMessagesLoading(vendorConversationKey.length > 0);
+    setActiveVendorDeal(null);
+  }
+  if (vendorBilling && vendorBilling.companyId !== activeVendorCompany?.id) {
+    setVendorBilling(null);
+  }
   const billingReturnFlag = searchParams.get("billing_return");
   const activeVendorBillingCompanyId = vendorBilling?.companyId || activeVendorCompany?.id || "";
+
+  const vendorProfileSource = buildVendorProfileForm(activeVendorCompany, currentVendorApplication);
+  const vendorProfileSourceKey = JSON.stringify(vendorProfileSource);
+  if (!vendorProfileEditing && vendorProfileSyncKey !== vendorProfileSourceKey) {
+    setVendorProfileSyncKey(vendorProfileSourceKey);
+    setVendorProfileForm(vendorProfileSource);
+  }
+
+  if (sessionRole === "guest" && (activeSection.startsWith("buyer-") || activeSection.startsWith("vendor-"))) {
+    setActiveSection("auth");
+  } else if (activeSection === "auth" && sessionRole === "buyer" && activeBuyer) {
+    setActiveSection("buyer-overview");
+  } else if (activeSection === "auth" && sessionRole === "vendor" && activeVendorCompany) {
+    setActiveSection("vendor-overview");
+  }
+
+  useEffect(() => {
+    localeRef.current = locale;
+  }, [locale]);
 
   useEffect(() => {
     if (!pathname) return;
@@ -800,11 +866,14 @@ export function OffshoreMatchApp({
   const readJson = useCallback(async function readJson<T>(input: RequestInfo, init?: RequestInit): Promise<{ ok: boolean; data?: T; error?: string }> {
     const response = await fetch(input, init);
     const payload = (await response.json().catch(() => ({}))) as T & { error?: string };
-    if (!response.ok) return { ok: false, error: payload.error ?? (locale === "ja" ? "リクエストに失敗しました。" : "Request failed.") };
+    if (!response.ok) {
+      const activeLocale = localeRef.current;
+      return { ok: false, error: payload.error ?? (activeLocale === "ja" ? "リクエストに失敗しました。" : "Request failed.") };
+    }
     return { ok: true, data: payload };
-  }, [locale]);
+  }, []);
 
-  const syncSessionContext = useCallback(async function syncSessionContext() {
+  const syncSessionContext = useCallback(async function syncSessionContext(options?: { runId?: number }) {
     const response = await readJson<{
       role: "guest" | "buyer" | "vendor" | "admin";
       buyer?: BuyerOrganization | null;
@@ -813,6 +882,7 @@ export function OffshoreMatchApp({
       supabaseSession?: SupabaseSessionPayload | null;
     }>("/api/auth/session", { cache: "no-store" });
 
+    if (options?.runId !== undefined && options.runId !== sessionBootstrapRef.current) return null;
     if (!response.ok || !response.data) {
       return null;
     }
@@ -875,7 +945,7 @@ export function OffshoreMatchApp({
     }
     setBrowserSupabaseReady(true);
     return !error;
-  }, [supabase, syncSessionContext]);
+  }, [setBrowserSupabaseReady, supabase, syncSessionContext]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -936,12 +1006,13 @@ export function OffshoreMatchApp({
     setThreadsLoading(false);
   }, [initialThreadId, preferredBuyerThreadId, readJson]);
 
-  const refreshThreadMessages = useCallback(async function refreshThreadMessages(threadId: string, options?: { markRead?: boolean }) {
+  const refreshThreadMessages = useCallback(async function refreshThreadMessages(threadId: string, options?: { markRead?: boolean; requestId?: number }) {
     if (!threadId) return;
-    setThreadMessagesLoading((prev) => prev || !loadedBuyerThreadIdsRef.current.has(threadId));
+    const requestId = options?.requestId ?? ++buyerConversationRequestRef.current;
     const response = await readJson<{ messages: MessageRecord[] }>(
       `/api/messages/threads/${threadId}/messages${options?.markRead ? "?markRead=1" : ""}`
     );
+    if (requestId !== buyerConversationRequestRef.current) return;
     if (!response.ok || !response.data) {
       setThreadMessagesLoading(false);
       return;
@@ -969,31 +1040,26 @@ export function OffshoreMatchApp({
             : thread
         )
       );
-      setBuyerThreadOverview((current) =>
-        current.map((thread) =>
-          thread.threadId === threadId
-            ? { ...thread, unreadCount: 0, notificationKind: null }
-            : thread
-        )
-      );
       void refreshThreads(threadId);
     }
   }, [readJson, refreshThreads]);
 
-  const refreshBuyerDeal = useCallback(async function refreshBuyerDeal(threadId: string) {
+  const refreshBuyerDeal = useCallback(async function refreshBuyerDeal(threadId: string, requestId = buyerConversationRequestRef.current) {
     if (!threadId) return;
     const response = await readJson<{ deal: DealRecord | null }>(`/api/messages/threads/${threadId}/deal`);
-    if (!response.ok || !response.data) return;
-    setActiveBuyerDeal(response.data.deal);
-    setBuyerThreadOverview((current) =>
+    if (requestId !== buyerConversationRequestRef.current || !response.ok || !response.data) return;
+    const deal = response.data.deal;
+    setActiveBuyerDeal(deal);
+    if (!deal) return;
+    setThreads((current) =>
       current.map((thread) =>
-        thread.threadId === threadId
+        thread.id === threadId
           ? {
               ...thread,
-              status: response.data!.deal?.status ?? "相談中",
-              proposedStatus: response.data!.deal?.proposedStatus ?? null,
-              proposedBy: response.data!.deal?.proposedBy ?? null,
-              lockedAt: response.data!.deal?.lockedAt ?? null
+              status: deal.status,
+              proposedStatus: deal.proposedStatus ?? null,
+              proposedBy: deal.proposedBy ?? null,
+              lockedAt: deal.lockedAt ?? null
             }
           : thread
       )
@@ -1032,19 +1098,21 @@ export function OffshoreMatchApp({
   }, [readJson]);
 
   const refreshVendorBilling = useCallback(async function refreshVendorBilling(vendorCompanyId: string) {
+    const requestId = ++vendorBillingRequestRef.current;
     const response = await readJson<{ billingAccount: VendorBillingAccount }>(`/api/billing/vendor-account/${vendorCompanyId}`, {
       cache: "no-store"
     });
-    if (!response.ok || !response.data) return;
+    if (requestId !== vendorBillingRequestRef.current || !response.ok || !response.data) return;
     setVendorBilling(response.data.billingAccount);
   }, [readJson]);
 
-  const refreshVendorThreadMessages = useCallback(async function refreshVendorThreadMessages(threadId: string, vendorCompanyId: string, options?: { markRead?: boolean }) {
+  const refreshVendorThreadMessages = useCallback(async function refreshVendorThreadMessages(threadId: string, vendorCompanyId: string, options?: { markRead?: boolean; requestId?: number }) {
     if (!threadId || !vendorCompanyId) return;
-    setVendorThreadMessagesLoading((prev) => prev || !loadedVendorThreadIdsRef.current.has(threadId));
+    const requestId = options?.requestId ?? ++vendorConversationRequestRef.current;
     const response = await readJson<{ messages: MessageRecord[] }>(
       `/api/messages/vendor/threads/${threadId}/messages${options?.markRead ? "?markRead=1" : ""}`
     );
+    if (requestId !== vendorConversationRequestRef.current) return;
     if (!response.ok || !response.data) {
       setVendorThreadMessagesLoading(false);
       return;
@@ -1072,106 +1140,46 @@ export function OffshoreMatchApp({
             : thread
         )
       );
-      setVendorThreadOverview((current) =>
-        current.map((thread) =>
-          thread.threadId === threadId
-            ? { ...thread, unreadCount: 0, notificationKind: null }
-            : thread
-        )
-      );
       void refreshVendorThreads(threadId);
     }
   }, [readJson, refreshVendorThreads]);
 
-  const refreshVendorDeal = useCallback(async function refreshVendorDeal(threadId: string, vendorCompanyId: string) {
+  const refreshVendorDeal = useCallback(async function refreshVendorDeal(threadId: string, vendorCompanyId: string, requestId = vendorConversationRequestRef.current) {
     if (!threadId || !vendorCompanyId) return;
     const response = await readJson<{ deal: DealRecord | null }>(`/api/messages/vendor/threads/${threadId}/deal`);
-    if (!response.ok || !response.data) return;
-    setActiveVendorDeal(response.data.deal);
-    setVendorThreadOverview((current) =>
+    if (requestId !== vendorConversationRequestRef.current || !response.ok || !response.data) return;
+    const deal = response.data.deal;
+    setActiveVendorDeal(deal);
+    if (!deal) return;
+    setVendorThreads((current) =>
       current.map((thread) =>
-        thread.threadId === threadId
+        thread.id === threadId
           ? {
               ...thread,
-              status: response.data!.deal?.status ?? "相談中",
-              proposedStatus: response.data!.deal?.proposedStatus ?? null,
-              proposedBy: response.data!.deal?.proposedBy ?? null,
-              lockedAt: response.data!.deal?.lockedAt ?? null
+              status: deal.status,
+              proposedStatus: deal.proposedStatus ?? null,
+              proposedBy: deal.proposedBy ?? null,
+              lockedAt: deal.lockedAt ?? null
             }
           : thread
       )
     );
   }, [readJson]);
 
-  const buildBuyerThreadOverview = useCallback(async function buildBuyerThreadOverview(nextThreads: BuyerThread[]) {
-    setBuyerThreadOverviewLoading(true);
-    const overviews = await Promise.all(
-      nextThreads.map(async (thread) => {
-        const response = await readJson<{ messages: MessageRecord[] }>(`/api/messages/threads/${thread.id}/messages`);
-        const messages = response.data?.messages ?? [];
-        const latest = messages[messages.length - 1];
-        const dealResponse = await readJson<{ deal: DealRecord | null }>(`/api/messages/threads/${thread.id}/deal`);
-        const deal = dealResponse.data?.deal ?? null;
-        return {
-          threadId: thread.id,
-          counterpartyLabel:
-            thread.vendorCompanyName ??
-            companies.find((company) => company.id === thread.vendorCompanyId)?.name ??
-            (locale === "ja" ? "不明な開発会社" : "Unknown Vendor"),
-          lastMessage: latest?.body ?? (locale === "ja" ? "まだメッセージはありません。" : "No messages yet."),
-          lastMessageAt: latest?.createdAt ?? thread.createdAt,
-          messageCount: messages.length,
-          status: deal?.status ?? "相談中",
-          proposedStatus: deal?.proposedStatus ?? null,
-          proposedBy: deal?.proposedBy ?? null,
-          lockedAt: deal?.lockedAt ?? null,
-          unreadCount: thread.unreadCount ?? 0,
-          notificationKind: thread.notificationKind ?? null
-        } satisfies ThreadOverview;
-      })
-    );
-    setBuyerThreadOverview(overviews.sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt)));
-    setBuyerThreadOverviewLoading(false);
-  }, [companies, locale, readJson]);
-
-  const buildVendorThreadOverview = useCallback(async function buildVendorThreadOverview(nextThreads: BuyerThread[], vendorCompanyId: string) {
-    setVendorThreadOverviewLoading(true);
-    const overviews = await Promise.all(
-      nextThreads.map(async (thread) => {
-        const response = await readJson<{ messages: MessageRecord[] }>(
-          `/api/messages/vendor/threads/${thread.id}/messages`
-        );
-        const messages = response.data?.messages ?? [];
-        const latest = messages[messages.length - 1];
-        const dealResponse = await readJson<{ deal: DealRecord | null }>(`/api/messages/vendor/threads/${thread.id}/deal`);
-        const deal = dealResponse.data?.deal ?? null;
-        return {
-          threadId: thread.id,
-          counterpartyLabel: thread.buyerCompanyName ?? thread.buyerEmail,
-          lastMessage: latest?.body ?? (locale === "ja" ? "まだメッセージはありません。" : "No messages yet."),
-          lastMessageAt: latest?.createdAt ?? thread.createdAt,
-          messageCount: messages.length,
-          status: deal?.status ?? "相談中",
-          proposedStatus: deal?.proposedStatus ?? null,
-          proposedBy: deal?.proposedBy ?? null,
-          lockedAt: deal?.lockedAt ?? null,
-          unreadCount: thread.unreadCount ?? 0,
-          notificationKind: thread.notificationKind ?? null
-        } satisfies ThreadOverview;
-      })
-    );
-    setVendorThreadOverview(overviews.sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt)));
-    setVendorThreadOverviewLoading(false);
-  }, [locale, readJson]);
-
   useEffect(() => {
+    const runId = ++sessionBootstrapRef.current;
+    let cancelled = false;
     void (async () => {
-      const sessionData = await syncSessionContext();
+      const sessionData = await syncSessionContext({ runId });
+      if (cancelled || sessionBootstrapRef.current !== runId) return;
       await ensureBrowserSupabaseSession(sessionData?.supabaseSession ?? null);
+      if (cancelled || sessionBootstrapRef.current !== runId) return;
       await refreshCompanies();
+      if (cancelled || sessionBootstrapRef.current !== runId) return;
 
       if (sessionData?.role === "buyer" && sessionData.buyer) {
         await refreshThreads();
+        if (cancelled || sessionBootstrapRef.current !== runId) return;
         setSessionHydrating(false);
         return;
       }
@@ -1182,7 +1190,9 @@ export function OffshoreMatchApp({
         } else {
           await refreshVendorApplication();
         }
+        if (cancelled || sessionBootstrapRef.current !== runId) return;
         await refreshVendorThreads();
+        if (cancelled || sessionBootstrapRef.current !== runId) return;
         setSessionHydrating(false);
         return;
       }
@@ -1196,6 +1206,7 @@ export function OffshoreMatchApp({
         setSessionRole("buyer");
         setActiveBuyer(initialBuyer);
         await refreshThreads();
+        if (cancelled || sessionBootstrapRef.current !== runId) return;
         setSessionHydrating(false);
         return;
       }
@@ -1207,7 +1218,9 @@ export function OffshoreMatchApp({
         } else {
           await refreshVendorApplication();
         }
+        if (cancelled || sessionBootstrapRef.current !== runId) return;
         await refreshVendorThreads();
+        if (cancelled || sessionBootstrapRef.current !== runId) return;
         setSessionHydrating(false);
         return;
       }
@@ -1220,82 +1233,105 @@ export function OffshoreMatchApp({
       setSessionRole("guest");
       setSessionHydrating(false);
     })();
+    return () => {
+      cancelled = true;
+      sessionBootstrapRef.current += 1;
+    };
   }, [ensureBrowserSupabaseSession, initialBuyer, initialVendorApplication, initialVendorCompany, initialAdminEmail, initialRole, refreshCompanies, refreshThreads, refreshVendorApplication, refreshVendorThreads, syncSessionContext]);
 
   useEffect(() => {
-    if (!buyerMessagingVisible || !activeThreadId) {
-      setThreadMessages([]);
-      setPendingThreadMessages([]);
-      setThreadMessagesLoading(false);
-      setActiveBuyerDeal(null);
-      return;
-    }
-    void refreshThreadMessages(activeThreadId, { markRead: true });
-    void refreshBuyerDeal(activeThreadId);
+    const requestId = ++buyerConversationRequestRef.current;
+    if (!buyerMessagingVisible || !activeThreadId) return;
+    const threadId = activeThreadId;
+    let cancelled = false;
+    void (async () => {
+      await Promise.resolve();
+      if (cancelled || requestId !== buyerConversationRequestRef.current) return;
+      if (!loadedBuyerThreadIdsRef.current.has(threadId)) setThreadMessagesLoading(true);
+      await refreshThreadMessages(threadId, { markRead: true, requestId });
+      if (cancelled || requestId !== buyerConversationRequestRef.current) return;
+      await refreshBuyerDeal(threadId, requestId);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [activeThreadId, buyerMessagingVisible, refreshBuyerDeal, refreshThreadMessages]);
 
   useEffect(() => {
-    if (!vendorMessagingVisible || !activeVendorThreadId || !activeVendorCompany) {
-      setVendorThreadMessages([]);
-      setPendingVendorThreadMessages([]);
-      setVendorThreadMessagesLoading(false);
-      setActiveVendorDeal(null);
-      return;
-    }
-    void refreshVendorThreadMessages(activeVendorThreadId, activeVendorCompany.id, { markRead: true });
-    void refreshVendorDeal(activeVendorThreadId, activeVendorCompany.id);
+    const requestId = ++vendorConversationRequestRef.current;
+    if (!vendorMessagingVisible || !activeVendorThreadId || !activeVendorCompany) return;
+    const threadId = activeVendorThreadId;
+    const vendorCompanyId = activeVendorCompany.id;
+    let cancelled = false;
+    void (async () => {
+      await Promise.resolve();
+      if (cancelled || requestId !== vendorConversationRequestRef.current) return;
+      if (!loadedVendorThreadIdsRef.current.has(threadId)) setVendorThreadMessagesLoading(true);
+      await refreshVendorThreadMessages(threadId, vendorCompanyId, { markRead: true, requestId });
+      if (cancelled || requestId !== vendorConversationRequestRef.current) return;
+      await refreshVendorDeal(threadId, vendorCompanyId, requestId);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [activeVendorThreadId, activeVendorCompany, vendorMessagingVisible, refreshVendorDeal, refreshVendorThreadMessages]);
 
   useEffect(() => {
-    if (!activeVendorCompany) {
-      setVendorBilling(null);
-      return;
-    }
+    if (!activeVendorCompany) return;
     if (vendorBillingHydratedRef.current && vendorBilling?.companyId === activeVendorCompany.id) {
       vendorBillingHydratedRef.current = false;
       return;
     }
-    void refreshVendorBilling(activeVendorCompany.id);
+    const companyId = activeVendorCompany.id;
+    let cancelled = false;
+    void (async () => {
+      await refreshVendorBilling(companyId);
+      if (cancelled) return;
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [activeVendorCompany, vendorBilling?.companyId, refreshVendorBilling]);
 
   useEffect(() => {
     if (sessionRole !== "vendor" || !activeVendorCompany) return;
     if (activeSection !== "vendor-billing" && activeSection !== "vendor-overview") return;
-    void refreshVendorBilling(activeVendorCompany.id);
+    const companyId = activeVendorCompany.id;
+    let cancelled = false;
+    void (async () => {
+      await refreshVendorBilling(companyId);
+      if (cancelled) return;
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [sessionRole, activeSection, activeVendorCompany, refreshVendorBilling]);
 
   useEffect(() => {
-    if (sessionRole !== "buyer") {
-      setBuyerThreadOverview([]);
-      return;
-    }
-    if (sessionHydrating) return;
-    if (activeSection !== "buyer-overview" && activeSection !== "buyer-projects") return;
-    void buildBuyerThreadOverview(threads);
-  }, [threads, sessionRole, companies, activeSection, buildBuyerThreadOverview, sessionHydrating]);
-
-  useEffect(() => {
     if (activeSection !== "marketplace") return;
-    const interval = window.setInterval(() => {
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== "visible") return;
       void refreshCompanies();
-    }, 10000);
-    return () => window.clearInterval(interval);
+    };
+    const interval = window.setInterval(refreshIfVisible, 60000);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    };
   }, [activeSection, refreshCompanies]);
 
   useEffect(() => {
     if (sessionRole !== "vendor") return;
-    void refreshVendorApplication();
+    let cancelled = false;
+    void (async () => {
+      await refreshVendorApplication();
+      if (cancelled) return;
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [sessionRole, refreshVendorApplication]);
-
-  useEffect(() => {
-    if (sessionRole !== "vendor" || !activeVendorCompany) {
-      setVendorThreadOverview([]);
-      return;
-    }
-    if (sessionHydrating) return;
-    if (activeSection !== "vendor-overview" && activeSection !== "vendor-history") return;
-    void buildVendorThreadOverview(vendorThreads, activeVendorCompany.id);
-  }, [vendorThreads, sessionRole, activeVendorCompany, activeSection, buildVendorThreadOverview, sessionHydrating]);
 
   useEffect(() => {
     if (!supabase || !browserSupabaseReady || sessionRole !== "buyer" || !activeBuyer) return;
@@ -1455,30 +1491,6 @@ export function OffshoreMatchApp({
     };
   }, [billingReturnFlag, sessionRole, activeVendorCompany, pathname, router, searchParams, refreshVendorApplication, refreshVendorBilling]);
 
-
-  useEffect(() => {
-    if (sessionRole === "guest" && (activeSection.startsWith("buyer-") || activeSection.startsWith("vendor-"))) {
-      setActiveSection("auth");
-      return;
-    }
-    if (activeSection !== "auth") return;
-    if (sessionRole === "buyer" && activeBuyer) {
-      setActiveSection("buyer-overview");
-      return;
-    }
-    if (sessionRole === "vendor" && activeVendorCompany) {
-      setActiveSection("vendor-overview");
-    }
-  }, [activeBuyer, activeVendorCompany, activeSection, sessionRole]);
-
-  useEffect(() => {
-    // An image upload updates the company record while this editor is open. Keep any
-    // unsaved text changes intact until the user explicitly saves or cancels.
-    if (!vendorProfileEditing) {
-      setVendorProfileForm(buildVendorProfileForm(activeVendorCompany, currentVendorApplication));
-    }
-  }, [activeVendorCompany, currentVendorApplication, vendorProfileEditing]);
-
   useEffect(() => {
     return () => {
       if (pendingCompanyThumbnail?.kind === "upload") URL.revokeObjectURL(pendingCompanyThumbnail.previewUrl);
@@ -1550,6 +1562,13 @@ export function OffshoreMatchApp({
   }, [companies, projectFilter, query, rateCap, techFilter]);
 
   const totalMarketplacePages = Math.max(1, Math.ceil(visibleCompanies.length / MARKETPLACE_PAGE_SIZE));
+  const marketplaceFilterKey = `${query}\0${techFilter}\0${projectFilter}\0${rateCap}`;
+  if (trackedMarketplaceFilter !== marketplaceFilterKey) {
+    setTrackedMarketplaceFilter(marketplaceFilterKey);
+    setMarketplacePage(1);
+  } else if (marketplacePage > totalMarketplacePages) {
+    setMarketplacePage(totalMarketplacePages);
+  }
   const favoriteCompanies = useMemo(
     () => companies.filter((company) => favoriteCompanyIds.includes(company.id)),
     [companies, favoriteCompanyIds]
@@ -1558,16 +1577,6 @@ export function OffshoreMatchApp({
     const start = (marketplacePage - 1) * MARKETPLACE_PAGE_SIZE;
     return visibleCompanies.slice(start, start + MARKETPLACE_PAGE_SIZE);
   }, [visibleCompanies, marketplacePage]);
-
-  useEffect(() => {
-    setMarketplacePage(1);
-  }, [query, techFilter, projectFilter, rateCap]);
-
-  useEffect(() => {
-    if (marketplacePage > totalMarketplacePages) {
-      setMarketplacePage(totalMarketplacePages);
-    }
-  }, [marketplacePage, totalMarketplacePages]);
 
   const matchedResults = useMemo<MatchResult[]>(() => {
     if (!criteria) return [];
@@ -1663,35 +1672,40 @@ export function OffshoreMatchApp({
   );
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
     const raw = window.sessionStorage.getItem(MATCHING_SESSION_STORAGE_KEY);
-    if (!raw) {
-      setMatchingSessionReady(true);
-      return;
-    }
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      if (!raw) {
+        setMatchingSessionReady(true);
+        return;
+      }
 
-    try {
-      const parsed = JSON.parse(raw) as {
-        criteria?: BuyerCriteria | null;
-        matchingDraftCriteria?: BuyerCriteria;
-        matchingAnswers?: MatchingAnswers;
-        matchingProjectGoal?: string;
-        matchingStepIndex?: number;
-        chatMessages?: ChatMessage[];
-      };
+      try {
+        const parsed = JSON.parse(raw) as {
+          criteria?: BuyerCriteria | null;
+          matchingDraftCriteria?: BuyerCriteria;
+          matchingAnswers?: MatchingAnswers;
+          matchingProjectGoal?: string;
+          matchingStepIndex?: number;
+          chatMessages?: ChatMessage[];
+        };
 
-      if (parsed.criteria) setCriteria(parsed.criteria);
-      if (parsed.matchingDraftCriteria) setMatchingDraftCriteria(parsed.matchingDraftCriteria);
-      if (parsed.matchingAnswers) setMatchingAnswers(parsed.matchingAnswers);
-      if (typeof parsed.matchingProjectGoal === "string") setMatchingProjectGoal(parsed.matchingProjectGoal);
-      if (typeof parsed.matchingStepIndex === "number") setMatchingStepIndex(parsed.matchingStepIndex);
-      if (Array.isArray(parsed.chatMessages) && parsed.chatMessages.length > 0) setChatMessages(parsed.chatMessages);
-    } catch {
-      window.sessionStorage.removeItem(MATCHING_SESSION_STORAGE_KEY);
-    } finally {
-      setMatchingSessionReady(true);
-    }
+        if (parsed.criteria) setCriteria(parsed.criteria);
+        if (parsed.matchingDraftCriteria) setMatchingDraftCriteria(parsed.matchingDraftCriteria);
+        if (parsed.matchingAnswers) setMatchingAnswers(parsed.matchingAnswers);
+        if (typeof parsed.matchingProjectGoal === "string") setMatchingProjectGoal(parsed.matchingProjectGoal);
+        if (typeof parsed.matchingStepIndex === "number") setMatchingStepIndex(parsed.matchingStepIndex);
+        if (Array.isArray(parsed.chatMessages) && parsed.chatMessages.length > 0) setChatMessages(parsed.chatMessages);
+      } catch {
+        window.sessionStorage.removeItem(MATCHING_SESSION_STORAGE_KEY);
+      } finally {
+        if (!cancelled) setMatchingSessionReady(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -1711,6 +1725,20 @@ export function OffshoreMatchApp({
     );
   }, [chatMessages, criteria, matchingAnswers, matchingDraftCriteria, matchingProjectGoal, matchingSessionReady, matchingStepIndex]);
 
+  const initialMatchingGreeting = createInitialMatchingAssistantMessage(locale).content;
+  if (
+    matchingSessionReady &&
+    !criteria &&
+    matchingStepIndex === 0 &&
+    !matchingProjectGoal &&
+    Object.keys(matchingAnswers).length === 0 &&
+    chatMessages.length === 1 &&
+    chatMessages[0]?.role === "assistant" &&
+    chatMessages[0].content !== initialMatchingGreeting
+  ) {
+    setChatMessages([{ ...chatMessages[0], content: initialMatchingGreeting }]);
+  }
+
   const buyerProjects = useMemo<ProjectHistoryRecord[]>(
     () => (activeBuyer ? SEED_PROJECT_HISTORY.filter((project) => project.buyerOrgId === activeBuyer.id && project.status === "completed") : []),
     [activeBuyer]
@@ -1722,19 +1750,42 @@ export function OffshoreMatchApp({
   );
 
   const vendorApplicationStatus = currentVendorApplication?.status ?? null;
-  const visibleThreadMessages = useMemo(
+  const visibleThreadMessages = useMemo(() => {
+    if (!buyerMessagingVisible || !activeThreadId) return [];
+    return [...threadMessages, ...pendingThreadMessages]
+      .filter((message) => message.threadId === activeThreadId)
+      .filter((message, index, collection) => collection.findIndex((entry) => entry.id === message.id) === index)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }, [activeThreadId, buyerMessagingVisible, pendingThreadMessages, threadMessages]);
+  const visibleVendorThreadMessages = useMemo(() => {
+    if (!vendorMessagingVisible || !activeVendorThreadId) return [];
+    return [...vendorThreadMessages, ...pendingVendorThreadMessages]
+      .filter((message) => message.threadId === activeVendorThreadId)
+      .filter((message, index, collection) => collection.findIndex((entry) => entry.id === message.id) === index)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }, [activeVendorThreadId, pendingVendorThreadMessages, vendorMessagingVisible, vendorThreadMessages]);
+  const emptyThreadMessage = locale === "ja" ? "まだメッセージはありません。" : "No messages yet.";
+  const buyerThreadOverview = useMemo(
     () =>
-      [...threadMessages, ...pendingThreadMessages]
-        .filter((message, index, collection) => collection.findIndex((entry) => entry.id === message.id) === index)
-        .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
-    [threadMessages, pendingThreadMessages]
+      threads
+        .map((thread) =>
+          toThreadOverview(
+            thread,
+            thread.vendorCompanyName ??
+              companies.find((company) => company.id === thread.vendorCompanyId)?.name ??
+              (locale === "ja" ? "不明な開発会社" : "Unknown Vendor"),
+            emptyThreadMessage
+          )
+        )
+        .sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt)),
+    [companies, emptyThreadMessage, locale, threads]
   );
-  const visibleVendorThreadMessages = useMemo(
+  const vendorThreadOverview = useMemo(
     () =>
-      [...vendorThreadMessages, ...pendingVendorThreadMessages]
-        .filter((message, index, collection) => collection.findIndex((entry) => entry.id === message.id) === index)
-        .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
-    [vendorThreadMessages, pendingVendorThreadMessages]
+      vendorThreads
+        .map((thread) => toThreadOverview(thread, thread.buyerCompanyName ?? thread.buyerEmail, emptyThreadMessage))
+        .sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt)),
+    [emptyThreadMessage, vendorThreads]
   );
   const buyerThreadOverviewById = useMemo(
     () => new Map(buyerThreadOverview.map((thread) => [thread.threadId, thread])),
@@ -1841,13 +1892,10 @@ export function OffshoreMatchApp({
     lastBuyerAutoScrollRef.current = { threadId: activeThreadId, lastMessageId: nextLastMessageId };
   }, [visibleThreadMessages, activeThreadId]);
 
-  useEffect(() => {
-    if (!activeThreadId) return;
-    const thread = threads.find((entry) => entry.id === activeThreadId);
-    if (!thread) return;
-    const status = thread.status ?? "相談中";
-    setCollapsedBuyerThreadGroups((current) => ({ ...current, [status]: false }));
-  }, [activeThreadId, threads]);
+  const activeBuyerThreadStatus = threads.find((entry) => entry.id === activeThreadId)?.status;
+  if (activeBuyerThreadStatus && collapsedBuyerThreadGroups[activeBuyerThreadStatus]) {
+    setCollapsedBuyerThreadGroups((current) => (current[activeBuyerThreadStatus] ? { ...current, [activeBuyerThreadStatus]: false } : current));
+  }
 
   useEffect(() => {
     const container = vendorMessagesContainerRef.current;
@@ -1864,13 +1912,10 @@ export function OffshoreMatchApp({
     lastVendorAutoScrollRef.current = { threadId: activeVendorThreadId, lastMessageId: nextLastMessageId };
   }, [visibleVendorThreadMessages, activeVendorThreadId]);
 
-  useEffect(() => {
-    if (!activeVendorThreadId) return;
-    const thread = vendorThreads.find((entry) => entry.id === activeVendorThreadId);
-    if (!thread) return;
-    const status = thread.status ?? "相談中";
-    setCollapsedVendorThreadGroups((current) => ({ ...current, [status]: false }));
-  }, [activeVendorThreadId, vendorThreads]);
+  const activeVendorThreadStatus = vendorThreads.find((entry) => entry.id === activeVendorThreadId)?.status;
+  if (activeVendorThreadStatus && collapsedVendorThreadGroups[activeVendorThreadStatus]) {
+    setCollapsedVendorThreadGroups((current) => (current[activeVendorThreadStatus] ? { ...current, [activeVendorThreadStatus]: false } : current));
+  }
 
   useEffect(() => {
     if (buyerThreadInputRef.current) autosizeTextarea(buyerThreadInputRef.current);
@@ -1936,9 +1981,10 @@ export function OffshoreMatchApp({
     !vendorProfileReadyForPublishing &&
     !vendorIsPublished;
 
-  useEffect(() => {
+  if (restartPlanBaseline !== effectiveVendorPlan) {
+    setRestartPlanBaseline(effectiveVendorPlan);
     setRestartPlanSelection(effectiveVendorPlan);
-  }, [effectiveVendorPlan]);
+  }
 
 function translatedTextForViewer(message: MessageRecord, target: "ja" | "en" | "company") {
   if (target === "ja") return message.translations.ja;
@@ -2010,23 +2056,12 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
               ...thread,
               status: deal.status,
               lockedAt: deal.lockedAt ?? null,
+              proposedStatus: deal.proposedStatus ?? null,
+              proposedBy: deal.proposedBy ?? null,
               notificationKind:
                 deal.proposedStatus && deal.proposedBy === "vendor"
                   ? "proposal-received"
                   : null
-            }
-          : thread
-      )
-    );
-    setBuyerThreadOverview((current) =>
-      current.map((thread) =>
-        thread.threadId === threadId
-          ? {
-              ...thread,
-              status: deal.status,
-              proposedStatus: deal.proposedStatus ?? null,
-              proposedBy: deal.proposedBy ?? null,
-              lockedAt: deal.lockedAt ?? null
             }
           : thread
       )
@@ -2042,23 +2077,12 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
               ...thread,
               status: deal.status,
               lockedAt: deal.lockedAt ?? null,
+              proposedStatus: deal.proposedStatus ?? null,
+              proposedBy: deal.proposedBy ?? null,
               notificationKind:
                 deal.proposedStatus && deal.proposedBy === "buyer"
                   ? "proposal-received"
                   : null
-            }
-          : thread
-      )
-    );
-    setVendorThreadOverview((current) =>
-      current.map((thread) =>
-        thread.threadId === threadId
-          ? {
-              ...thread,
-              status: deal.status,
-              proposedStatus: deal.proposedStatus ?? null,
-              proposedBy: deal.proposedBy ?? null,
-              lockedAt: deal.lockedAt ?? null
             }
           : thread
       )
@@ -2084,7 +2108,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
     setActiveBuyerDeal(response.data.deal);
     applyBuyerDealToOverview(activeThreadId, response.data.deal);
     await refreshThreadMessages(activeThreadId);
-    await buildBuyerThreadOverview(threads);
+    await refreshThreads(activeThreadId);
   }
 
   async function handleBuyerDealProposalResponse(action: "accept" | "reject") {
@@ -2101,7 +2125,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
     setActiveBuyerDeal(response.data.deal);
     applyBuyerDealToOverview(activeThreadId, response.data.deal);
     await refreshThreadMessages(activeThreadId);
-    await buildBuyerThreadOverview(threads);
+    await refreshThreads(activeThreadId);
   }
 
   async function confirmBuyerCompletionProposal() {
@@ -2128,7 +2152,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
     setActiveVendorDeal(response.data.deal);
     applyVendorDealToOverview(activeVendorThreadId, response.data.deal);
     await refreshVendorThreadMessages(activeVendorThreadId, activeVendorCompany.id);
-    await buildVendorThreadOverview(vendorThreads, activeVendorCompany.id);
+    await refreshVendorThreads(activeVendorThreadId);
   }
 
   async function handleVendorDealProposalResponse(action: "accept" | "reject") {
@@ -2145,7 +2169,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
     setActiveVendorDeal(response.data.deal);
     applyVendorDealToOverview(activeVendorThreadId, response.data.deal);
     await refreshVendorThreadMessages(activeVendorThreadId, activeVendorCompany.id);
-    await buildVendorThreadOverview(vendorThreads, activeVendorCompany.id);
+    await refreshVendorThreads(activeVendorThreadId);
   }
 
   async function confirmVendorCompletionProposal() {
@@ -3920,13 +3944,13 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                                   </span>
                                 ) : null}
                                 <span className="rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold text-cyan-700">{dealStatusLabel(thread.status, locale)}</span>
-                                <p className="text-[11px] text-slate-500">{new Date(thread.lastMessageAt).toLocaleDateString("ja-JP")}</p>
+                                <p className="text-[11px] text-slate-500">{new Date(thread.lastMessageAt).toLocaleDateString(locale === "ja" ? "ja-JP" : "en-US")}</p>
                               </div>
                             </div>
                             <p className="mt-2 text-xs leading-6 text-slate-600">{thread.lastMessage}</p>
                           </div>
                         ))}
-                        {buyerThreadOverview.length === 0 ? <p className="text-xs text-slate-500">{locale === "ja" ? "まだチャット履歴はありません。" : "No chat history yet."}</p> : null}
+                        {!(sessionHydrating || threadsLoading) && buyerThreadOverview.length === 0 ? <p className="text-xs text-slate-500">{locale === "ja" ? "まだチャット履歴はありません。" : "No chat history yet."}</p> : null}
                       </div>
                     </Card>
                   </div>
@@ -4041,8 +4065,8 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                       <h3 className="font-semibold text-slate-900">{locale === "ja" ? "過去の発注案件" : "Past Projects"}</h3>
                     </div>
                     <div className="grid gap-3">
-                      {buyerThreadOverviewLoading ? <InlineLoadingState label={locale === "ja" ? "過去案件を読み込み中..." : "Loading past projects..."} /> : null}
-                      {!buyerThreadOverviewLoading && combinedBuyerProjects.map((project) => (
+                      {(sessionHydrating || threadsLoading) ? <InlineLoadingState label={locale === "ja" ? "過去案件を読み込み中..." : "Loading past projects..."} /> : null}
+                      {!(sessionHydrating || threadsLoading) && combinedBuyerProjects.map((project) => (
                         <div key={project.id} className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <p className="text-sm font-semibold text-slate-900">{project.title}</p>
@@ -4054,7 +4078,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                           <p className="mt-2 text-xs font-semibold text-slate-500">{locale === "ja" ? "委託先" : "Vendor"}: {project.vendorCompanyName} / {new Date(project.deliveredAt).toLocaleDateString(locale === "ja" ? "ja-JP" : "en-US")}</p>
                         </div>
                       ))}
-                      {!buyerThreadOverviewLoading && combinedBuyerProjects.length === 0 ? (
+                      {!(sessionHydrating || threadsLoading) && combinedBuyerProjects.length === 0 ? (
                         <p className="text-sm text-slate-600">{locale === "ja" ? "完了した案件がここに表示されます。" : "Completed projects will appear here."}</p>
                       ) : null}
                     </div>
@@ -4456,7 +4480,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                           <p className="mt-2 text-xs leading-6 text-slate-600">{thread.lastMessage}</p>
                         </div>
                       ))}
-                      {vendorThreadOverview.length === 0 ? <p className="text-xs text-slate-500">{locale === "ja" ? "まだ問い合わせ履歴はありません。" : "No inquiry history yet."}</p> : null}
+                      {!(sessionHydrating || vendorThreadsLoading) && vendorThreadOverview.length === 0 ? <p className="text-xs text-slate-500">{locale === "ja" ? "まだ問い合わせ履歴はありません。" : "No inquiry history yet."}</p> : null}
                     </div>
                   </Card>
                 </div>
@@ -4576,7 +4600,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                       <div className="mt-4 grid gap-4">
                       {activeVendorCompany.thumbnailUrl ? (
                         <div className="relative aspect-[16/10] max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
-                          <img src={activeVendorCompany.thumbnailUrl} alt={locale === "ja" ? `${activeVendorCompany.name}の会社画像` : `${activeVendorCompany.name} company image`} className="h-full w-full object-cover" />
+                          <RemoteImage src={activeVendorCompany.thumbnailUrl} alt={locale === "ja" ? `${activeVendorCompany.name}の会社画像` : `${activeVendorCompany.name} company image`} className="object-cover" sizes="(max-width: 768px) 100vw, 448px" />
                           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/45 via-transparent to-transparent" />
                           <span className="absolute bottom-3 left-3 rounded-full border border-white/25 bg-slate-950/35 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
                             {locale === "ja" ? "掲載プレビュー" : "Listing preview"}
@@ -4690,7 +4714,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                     <div className="mt-4 grid gap-4">
                       {activeVendorCompany?.thumbnailUrl ? (
                         <div className="relative aspect-[16/10] max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
-                          <img src={activeVendorCompany.thumbnailUrl} alt={locale === "ja" ? `${activeVendorCompany.name}の会社画像` : `${activeVendorCompany.name} company image`} className="h-full w-full object-cover" />
+                          <RemoteImage src={activeVendorCompany.thumbnailUrl} alt={locale === "ja" ? `${activeVendorCompany.name}の会社画像` : `${activeVendorCompany.name} company image`} className="object-cover" sizes="(max-width: 768px) 100vw, 448px" />
                           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/40 via-transparent to-transparent" />
                           <span className="absolute bottom-3 left-3 rounded-full border border-white/25 bg-slate-950/35 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
                             {locale === "ja" ? "掲載中の会社画像" : "Live company image"}
@@ -4795,7 +4819,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                           </div>
                           {editableThumbnailUrl ? (
                             <div className="company-thumbnail-preview relative h-24 w-40 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                              <img src={editableThumbnailUrl} alt={locale === "ja" ? `${activeVendorCompany?.name ?? ""}の会社画像` : `${activeVendorCompany?.name ?? ""} company image`} className="h-full w-full object-cover" />
+                              <RemoteImage src={editableThumbnailUrl} alt={locale === "ja" ? `${activeVendorCompany?.name ?? ""}の会社画像` : `${activeVendorCompany?.name ?? ""} company image`} className="object-cover" sizes="160px" />
                               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/35 to-transparent" />
                             </div>
                           ) : (
@@ -5525,8 +5549,8 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                     <h3 className="font-semibold text-slate-900">{locale === "ja" ? "過去案件" : "Past Projects"}</h3>
                   </div>
                   <div className="grid gap-3">
-                    {vendorThreadOverviewLoading ? <InlineLoadingState label={locale === "ja" ? "過去案件を読み込み中..." : "Loading past projects..."} /> : null}
-                    {!vendorThreadOverviewLoading && combinedVendorProjects.map((project) => (
+                    {(sessionHydrating || vendorThreadsLoading) ? <InlineLoadingState label={locale === "ja" ? "過去案件を読み込み中..." : "Loading past projects..."} /> : null}
+                    {!(sessionHydrating || vendorThreadsLoading) && combinedVendorProjects.map((project) => (
                       <div key={project.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-sm font-semibold text-slate-900">{project.title}</p>
@@ -5540,7 +5564,7 @@ function createInitialMatchingAssistantMessage(locale: "ja" | "en"): ChatMessage
                         </p>
                       </div>
                     ))}
-                    {!vendorThreadOverviewLoading && combinedVendorProjects.length === 0 ? (
+                    {!(sessionHydrating || vendorThreadsLoading) && combinedVendorProjects.length === 0 ? (
                       <p className="text-sm text-slate-600">{locale === "ja" ? "完了した案件がここに表示されます。" : "Completed engagements will appear here."}</p>
                     ) : null}
                   </div>
