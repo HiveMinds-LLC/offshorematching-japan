@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { AppTopbar } from "@/components/app/app-topbar";
 import { useLocale } from "@/components/i18n/locale-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { RemoteImage } from "@/components/ui/remote-image";
 import { useToast } from "@/components/ui/toaster";
 import type { BuyerOrganization } from "@/lib/domain/types";
 import type { Company } from "@/lib/domain/types";
@@ -146,11 +147,13 @@ export function CompanyProfilePageClient({
   const [buyer] = useState<BuyerOrganization | null>(initialBuyer);
   const [favoriteCompanyIds, setFavoriteCompanyIds] = useState<string[]>(initialFavoriteCompanyIds);
   const [threadLoading, setThreadLoading] = useState(false);
+  const favoriteRequestRef = useRef(0);
 
   async function toggleFavoriteCompany(companyId: string) {
+    const requestId = ++favoriteRequestRef.current;
     const isSaved = favoriteCompanyIds.includes(companyId);
     setFavoriteCompanyIds((prev) =>
-      isSaved ? prev.filter((id) => id !== companyId) : [companyId, ...prev]
+      isSaved ? prev.filter((id) => id !== companyId) : (prev.includes(companyId) ? prev : [companyId, ...prev])
     );
 
     const response = await fetch("/api/buyers/saved-companies", {
@@ -158,9 +161,10 @@ export function CompanyProfilePageClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ companyId })
     });
+    if (requestId !== favoriteRequestRef.current) return;
     if (!response.ok) {
       setFavoriteCompanyIds((prev) =>
-        isSaved ? [companyId, ...prev] : prev.filter((id) => id !== companyId)
+        isSaved ? (prev.includes(companyId) ? prev : [companyId, ...prev]) : prev.filter((id) => id !== companyId)
       );
       toast({
         tone: "error",
@@ -185,27 +189,30 @@ export function CompanyProfilePageClient({
   async function handleStartThread() {
     if (!company || sessionRole !== "buyer" || !buyer) return;
     setThreadLoading(true);
-    const response = await fetch("/api/messages/threads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ vendorCompanyId: company.id })
-    });
-    const payload = (await response.json().catch(() => ({}))) as { error?: string; thread?: { id: string } };
-    if (!response.ok) {
-      toast({
-        tone: "error",
-        title: locale === "ja" ? "問い合わせを開始できませんでした" : "Could not start inquiry",
-        description: payload.error ?? (locale === "ja" ? "時間をおいて再度お試しください。" : "Please try again.")
+    try {
+      const response = await fetch("/api/messages/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vendorCompanyId: company.id })
       });
+      const payload = (await response.json().catch(() => ({}))) as { error?: string; thread?: { id: string } };
+      if (!response.ok) {
+        toast({
+          tone: "error",
+          title: locale === "ja" ? "問い合わせを開始できませんでした" : "Could not start inquiry",
+          description: payload.error ?? (locale === "ja" ? "時間をおいて再度お試しください。" : "Please try again.")
+        });
+        return;
+      }
+      toast({
+        tone: "success",
+        title: locale === "ja" ? "問い合わせを開始しました" : "Inquiry started"
+      });
+      router.push(`/app?section=buyer-messages&thread=${payload.thread?.id ?? ""}`);
+      router.refresh();
+    } finally {
       setThreadLoading(false);
-      return;
     }
-    toast({
-      tone: "success",
-      title: locale === "ja" ? "問い合わせを開始しました" : "Inquiry started"
-    });
-    router.push(`/app?section=buyer-messages&thread=${payload.thread?.id ?? ""}`);
-    router.refresh();
   }
 
   return (
@@ -230,10 +237,11 @@ export function CompanyProfilePageClient({
           <>
               {company.thumbnailUrl ? (
                 <div className="relative aspect-[16/8] max-w-2xl overflow-hidden rounded-[24px] border border-slate-100 bg-slate-50 shadow-sm">
-                  <img
+                  <RemoteImage
                     src={company.thumbnailUrl}
                     alt={locale === "ja" ? `${company.name}の会社画像` : `${company.name} company image`}
-                    className="h-full w-full object-cover"
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 672px"
                   />
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/45 via-slate-950/5 to-transparent" />
                   <span className="absolute bottom-4 left-4 rounded-full border border-white/25 bg-slate-950/35 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
