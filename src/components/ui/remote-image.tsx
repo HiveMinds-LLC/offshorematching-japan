@@ -12,7 +12,7 @@ export function RemoteImage({ src, alt, className, sizes }: RemoteImageProps) {
   if (!/^https?:\/\//i.test(src)) {
     // Local previews use blob URLs, which the image optimizer cannot fetch.
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt={alt} className={className} />;
+    return <img src={src} alt={alt} className={`h-full w-full ${className ?? ""}`} />;
   }
 
   return <Image src={src} alt={alt} fill sizes={sizes} className={className} />;
